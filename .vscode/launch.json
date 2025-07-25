@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug STM32F103 (ST-Link)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/OsExample.elf", // 
+      "device": "STM32F103C8",
+      "configFiles": [
+        "interface/stlink.cfg",
+        "target/stm32f1x.cfg"
+      ],
+      "runToMain": true,
+      "svdFile": "${workspaceFolder}/STM32F103.svd", //
+      "preLaunchTask": "build",
+      "postLaunchCommands": [
+        "monitor reset halt",     // 
+        "load",                   // 
+        "monitor arm semihosting enable"
+      ],
+      "showDevDebugOutput": true,
+      "registers": [
+        "r0", "r1", "r2", "r3", "r12", "lr", "pc", "xPSR", "sp", "msp", "psp"
+      ],
+      
+    }
+  ]
+}
+

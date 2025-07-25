@@ -1,0 +1,13 @@
+{
+    "cortex-debug.variableUseNaturalFormat": true,
+    "files.associations": {
+        "stm32f10x_tim.h": "c",
+        "uart.h": "c",
+        "stdio.h": "c",
+        "stm32f10x.h": "c",
+        "kernel.h": "c",
+        "stdlib.h": "c",
+        "stdint.h": "c",
+        "timebase.h": "c"
+    }
+}
