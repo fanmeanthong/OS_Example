@@ -5,52 +5,68 @@
 #include "uart.h"
 extern TaskControlBlock TaskTable[TASK_NUM];
 extern TaskType    currentTask ;
+// =====================
+// Peripheral Base Address
+// =====================
 #define FLASH_BASE           ((uint32_t)0x40022000)
+
+// =====================
+// FLASH Register
+// =====================
 #define FLASH_ACR            (*(volatile uint32_t *)(FLASH_BASE + 0x00))
-
-#define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
-#define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
-
 #define FLASH_ACR_PRFTBE     (1 << 4)
 #define FLASH_ACR_LATENCY_2  (2 << 0)
 #define FLASH_ACR_LATENCY    (0x7 << 0)
 
+// =====================
+// RCC Register
+// =====================
+#define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
+#define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
 #define RCC_CR_HSEON         (1 << 16)
 #define RCC_CR_HSERDY        (1 << 17)
 #define RCC_CR_PLLON         (1 << 24)
 #define RCC_CR_PLLRDY        (1 << 25)
-
 #define RCC_CFGR_SW          (0x3 << 0)
 #define RCC_CFGR_SW_PLL      (0x2 << 0)
 #define RCC_CFGR_SWS         (0x3 << 2)
 #define RCC_CFGR_SWS_PLL     (0x2 << 2)
-
 #define RCC_CFGR_HPRE        (0xF << 4)
 #define RCC_CFGR_PPRE1       (0x7 << 8)
 #define RCC_CFGR_PPRE2       (0x7 << 11)
-
 #define RCC_CFGR_PPRE1_DIV2  (0x4 << 8)
-
 #define RCC_CFGR_PLLSRC      (1 << 16)
 #define RCC_CFGR_PLLMULL     (0xF << 18)
 #define RCC_CFGR_PLLMULL9    (0x7 << 18)
 
+// =====================
+// GPIO Register
+// =====================
 #define GPIO_CRL(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRL_OFFSET))
 #define GPIO_CRH(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRH_OFFSET))
 #define GPIO_ODR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_ODR_OFFSET))
-#define GPIO_IDR(GPIO_BASE)   (*(volatile uint32_t *)((GPIO_BASE) + GPIO_IDR_OFFSET))
+#define GPIO_IDR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_IDR_OFFSET))
 
-#define EVENT_BTN_PRESS   (1U << 0)
+// =====================
+// Event & Task Macro
+// =====================
+#define EVENT_BTN_PRESS      (1U << 0)
+#define TASK_LED_CTRL_ID     0
+#define TASK_BLINK_ID        1
+#define TASK_BTN_POLL_ID     2
 
-#define TASK_LED_CTRL_ID   0
-#define TASK_BLINK_ID      1
-#define TASK_BTN_POLL_ID   2
-
+// =====================
+// Hàm delay theo ms
+// =====================
 void delay_ms(volatile uint32_t ms) {
     for (volatile uint32_t i = 0; i < ms * 8000; i++) {
         __asm volatile ("nop");
     }
 }
+
+// =====================
+// Cấu hình clock hệ thống 72MHz
+// =====================
 void SystemClock_Config(void)
 {
     // Enable HSE
@@ -82,7 +98,9 @@ void SystemClock_Config(void)
     while ((RCC_CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
 }
 
-// ====== Scheduler Launch Function ======
+// =====================
+// Khởi tạo GPIO cho LED và nút nhấn
+// =====================
 void GPIO_InitAll(void) {
     // Bật xung cho GPIOA và GPIOC
     RCC_APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
@@ -102,20 +120,46 @@ void GPIO_InitAll(void) {
     GPIO_ODR(GPIOA_BASE) |= (1 << 1);         // Kéo lên (bắt buộc cho Pull-Up)
 }
 
+// =====================
+// Bật LED trên PC13
+// =====================
 void Led_On (void) {  GPIO_ODR(GPIOC_BASE)  = !(1 << 13); }
+// =====================
+// Tắt LED trên PC13
+// =====================
 void Led_Off(void) {  GPIO_ODR(GPIOC_BASE) = (1 << 13); }
+// =====================
+// Bật LED trên PA0
+// =====================
 void LedA_On(void) { GPIO_ODR(GPIOA_BASE) |= (1 << 0); }
+// =====================
+// Tắt LED trên PA0
+// =====================
 void LedA_Off(void) { GPIO_ODR(GPIOA_BASE) &= ~(1 << 0); }
+// =====================
+// Đảo trạng thái LED trên PA0
+// =====================
 void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
-/* --- Triển khai 3 Task tuần tự --- */
 
+// =====================
+// Task: Blink LED 10 lần rồi dừng
+// =====================
 void Task_Blink(void) {
-    LedA_On();  delay_ms(200);
-    LedA_Off(); delay_ms(200);
-    
-    ChainTask(TASK_BLINK_ID);  // 
+    static int count = 0;
+    if (count < 10) {
+        LedA_On();  delay_ms(200);
+        LedA_Off(); delay_ms(200);
+        count++;
+        ChainTask(TASK_BLINK_ID);  // tiếp tục blink
+    } else {
+        // Sau khi blink 10 lần thì dừng task
+        TerminateTask();
+    }
 }
 
+// =====================
+// Task: Poll trạng thái nút nhấn
+// =====================
 void Task_ButtonPoll(void) {
     static uint8_t last_state = 1;
     uint8_t now = (GPIO_IDR(GPIOA_BASE) & (1 << 1)) ? 1 : 0;
@@ -130,8 +174,10 @@ void Task_ButtonPoll(void) {
     ChainTask(TASK_BTN_POLL_ID);  // 
 }
 
+// =====================
+// Task: Điều khiển LED khi có sự kiện nút nhấn
+// =====================
 void Task_LEDControl(void) {
-    
     EventMaskType ev;
     WaitEvent(EVENT_BTN_PRESS);
     GetEvent(currentTask, &ev);
@@ -147,6 +193,9 @@ void Task_LEDControl(void) {
     TerminateTask();
 }
 
+// =====================
+// Hàm main: Khởi tạo hệ thống và chạy OS
+// =====================
 int main(void) {
     SystemClock_Config();
     GPIO_InitAll();
