@@ -1,10 +1,9 @@
 #include <stdint.h>
 #include "stm32f10x.h"
 #include "kernel.h"
-#include "timebase.h"
 #include "uart.h"
 extern TaskControlBlock TaskTable[TASK_NUM];
-extern TaskType    currentTask ;
+extern TaskType   currentTask ;
 // =====================
 // Peripheral Base Address
 // =====================
@@ -46,6 +45,27 @@ extern TaskType    currentTask ;
 #define GPIO_CRH(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRH_OFFSET))
 #define GPIO_ODR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_ODR_OFFSET))
 #define GPIO_IDR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_IDR_OFFSET))
+#define SYSTICK_LOAD_VAL     (72000 - 1) // 72MHz / 1000 = 1ms
+#define SYSTICK_CTRL_ENABLE  (1 << 0)
+#define SYSTICK_CTRL_TICKINT (1 << 1)
+#define SYSTICK_CTRL_CLKSRC  (1 << 2)
+
+#define SYST_CSR   (*(volatile uint32_t*)0xE000E010)
+#define SYST_RVR   (*(volatile uint32_t*)0xE000E014)
+#define SYST_CVR   (*(volatile uint32_t*)0xE000E018)
+
+void SysTick_Init(void) {
+    SYST_RVR = SYSTICK_LOAD_VAL;              // Reload value for 1ms
+    SYST_CVR = 0;                              // Clear current value
+    SYST_CSR = SYSTICK_CTRL_ENABLE |
+               SYSTICK_CTRL_TICKINT |
+               SYSTICK_CTRL_CLKSRC;           // Enable SysTick + interrupt + processor clock
+}
+
+void SysTick_Handler(void) {
+
+    Counter_Tick(0); // Giả sử Counter 0 là counter_1ms
+}
 
 // =====================
 // Event & Task Macro
@@ -145,16 +165,11 @@ void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
 // Task: Blink LED 10 lần rồi dừng
 // =====================
 void Task_Blink(void) {
-    static int count = 0;
-    if (count < 10) {
-        LedA_On();  delay_ms(200);
-        LedA_Off(); delay_ms(200);
-        count++;
-        ChainTask(TASK_BLINK_ID);  // tiếp tục blink
-    } else {
-        // Sau khi blink 10 lần thì dừng task
-        TerminateTask();
-    }
+    //for(int i = 0; i < 5; i++) {
+        Led_On();  delay_ms(250);
+        Led_Off(); delay_ms(250);
+    //}
+        TerminateTask();  
 }
 
 // =====================
@@ -199,6 +214,7 @@ void Task_LEDControl(void) {
 int main(void) {
     SystemClock_Config();
     GPIO_InitAll();
+    SysTick_Init();
     OS_Init();
 
     // Khởi tạo Task Table
@@ -207,10 +223,7 @@ int main(void) {
     TaskTable[TASK_BTN_POLL_ID] = (TaskControlBlock){TASK_BTN_POLL_ID, Task_ButtonPoll, SUSPENDED, 1, 0, 2};
 
     // Khởi động ban đầu các task
-    ActivateTask(TASK_BTN_POLL_ID);  // Task này luôn polling → nên chạy trước
-    ActivateTask(TASK_BLINK_ID);     // Nháy LED liên tục
-    ActivateTask(TASK_LED_CTRL_ID);  // Sẽ đợi sự kiện
-
+    SetupAlarm_Demo();
     while (1) {
         OS_Schedule();
     }

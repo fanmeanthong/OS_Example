@@ -2,7 +2,6 @@
 #define __KERNEL_H
 
 #include <stdint.h>
-#include "timebase.h"
 #include "uart.h"
 
 typedef uint32_t TickType;      // Số tick (thường là uint16 hoặc uint32)
@@ -22,11 +21,8 @@ typedef enum {
 } AlarmActionType;
 #define TASK_NUM 3  /* Số Task trong hệ thống */
 #define MAX_ALARMS 10 // Số lượng Alarm tối đa cho mỗi Counter
-// ====== TCB Structure ======
 
-typedef uint32_t EventMaskType;
-/* Định nghĩa kiểu Task và trạng thái */
-typedef uint8_t TaskType;
+/* Định nghĩa trạng thái */
 typedef enum {
     SUSPENDED,
     READY,
@@ -38,17 +34,22 @@ typedef enum {
 #define E_OK       0
 #define E_OS_LIMIT 1
 
-/* Task Control Block: bảng tĩnh quản lý Task */
+/**
+ * @brief Structure representing the control block for a task in the operating system.
+ *
+ * This structure holds all relevant information about a task, including its identifier,
+ * entry function, current state, priority, activation count, activation limit, and event masks.
+ */
 typedef struct {
-    TaskType id;                   /* ID của Task */
-    void (*TaskEntry)(void);       /* Con trỏ hàm entry */
-    TaskStateType state;           /* Trạng thái hiện tại */
-    uint8_t priority;              /* Ưu tiên (0 = cao nhất) */
-    uint8_t ActivationCount;       /* Đếm số lần đã activate */
-    uint8_t OsTaskActivation;      /* Giới hạn activate */
+    TaskType id;                   // Task ID
+    void (*TaskEntry)(void);       // Pointer to task entry function
+    TaskStateType state;           // Current state of the task
+    uint8_t priority;              // Task priority (0 = highest)
+    uint8_t ActivationCount;       // Number of times the task has been activated
+    uint8_t OsTaskActivation;      // Activation limit for the task
 
-    EventMaskType SetEventMask;   // sự kiện đã đến
-    EventMaskType WaitEventMask;  // sự kiện đang chờ
+    EventMaskType SetEventMask;    // Events that have been set (arrived)
+    EventMaskType WaitEventMask;   // Events the task is currently waiting for
 } TaskControlBlock;
 
 typedef struct {
@@ -88,4 +89,12 @@ void WaitEvent(EventMaskType mask);
 void SetEvent(uint8_t task_id, EventMaskType mask);
 void ClearEvent(EventMaskType mask);
 EventMaskType GetEvent(TaskType id, EventMaskType *event);
+
+
+void Counter_Tick(CounterTypeId cid);
+uint8_t SetRelAlarm(AlarmTypeId alarm_id, TickType offset, TickType cycle);
+uint8_t SetAbsAlarm(AlarmTypeId alarm_id, TickType start, TickType);
+uint8_t CancelAlarm(AlarmTypeId alarm_id);
+void SetupAlarm_Demo() ;
+void my_callback();
 #endif //
