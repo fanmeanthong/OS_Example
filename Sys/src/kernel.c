@@ -32,7 +32,9 @@ CounterType counter_table[COUNTER_NUM] = {
 // =====================
 // OS Core Functions
 // =====================
-/* Initialize OS: set all tasks to SUSPENDED, ActivationCount = 0 */
+/**
+ * @brief Initialize OS: set all tasks to SUSPENDED, ActivationCount = 0
+ */
 void OS_Init(void) {
     for (int i = 0; i < TASK_NUM; i++) {
         TaskTable[i].state           = SUSPENDED;
@@ -41,7 +43,9 @@ void OS_Init(void) {
     }
 }
 
-/* ActivateTask: increase count, if over limit return error, SUSPENDED→READY */
+/**
+ * @brief Activate a task: increase count, set READY if SUSPENDED
+ */
 uint8_t ActivateTask(TaskType id) {
     TaskControlBlock *t = &TaskTable[id];
 
@@ -59,7 +63,9 @@ uint8_t ActivateTask(TaskType id) {
     return E_OK;
 }
 
-/* TerminateTask: decrease count, RUNNING→SUSPENDED, call scheduler */
+/**
+ * @brief Terminate current task: decrease count, set SUSPENDED or READY
+ */
 uint8_t TerminateTask(void) {
     TaskControlBlock *t = &TaskTable[currentTask];
 
@@ -78,20 +84,26 @@ uint8_t TerminateTask(void) {
     return E_OK;
 }
 
-/* ChainTask: Terminate current and Activate another */
+/**
+ * @brief Chain current task to another: terminate current, activate another
+ */
 uint8_t ChainTask(TaskType id) {
     ActivateTask(id);        // 
     TerminateTask();         // 
     return E_OK;
 }
 
-/* GetTaskState: get current state of a task */
+/**
+ * @brief Get current state of a task
+ */
 uint8_t GetTaskState(TaskType id, TaskStateType *s) {
     *s = TaskTable[id].state;
     return E_OK;
 }
 
-/* Cooperative round-robin scheduler: pick first READY task */
+/**
+ * @brief Cooperative round-robin scheduler: pick first READY task
+ */
 void OS_Schedule(void) {
     for (int i = 1; i <= TASK_NUM; i++) {
         TaskType idx = (currentTask + i) % TASK_NUM;
@@ -107,6 +119,9 @@ void OS_Schedule(void) {
 // =====================
 // Event Functions
 // =====================
+/**
+ * @brief Wait for event mask, set WAITING if not arrived
+ */
 void WaitEvent(EventMaskType mask) {
     if ((TaskTable[currentTask].SetEventMask & mask) == 0) {
         TaskTable[currentTask].WaitEventMask = mask;
@@ -117,6 +132,9 @@ void WaitEvent(EventMaskType mask) {
     // Keep RUNNING
 }
 
+/**
+ * @brief Set event mask for a task, wake up if waiting
+ */
 void SetEvent(uint8_t task_id, EventMaskType mask) {
     TaskTable[task_id].SetEventMask |= mask;
 
@@ -128,10 +146,16 @@ void SetEvent(uint8_t task_id, EventMaskType mask) {
     }
 }
 
+/**
+ * @brief Clear event mask for current task
+ */
 void ClearEvent(EventMaskType mask) {
     TaskTable[currentTask].SetEventMask &= ~mask;
 }
 
+/**
+ * @brief Get event mask of a task
+ */
 EventMaskType GetEvent(TaskType id, EventMaskType *event) {
     *event = TaskTable[id].SetEventMask;
     return E_OK;
@@ -140,6 +164,9 @@ EventMaskType GetEvent(TaskType id, EventMaskType *event) {
 // =====================
 // Alarm & Counter Functions
 // =====================
+/**
+ * @brief Set relative alarm: activate after offset, repeat by cycle
+ */
 uint8_t SetRelAlarm(AlarmTypeId alarm_id, TickType offset, TickType cycle) {
     if (alarm_id >= MAX_ALARMS || offset == 0) return E_OS_LIMIT;
 
@@ -153,6 +180,9 @@ uint8_t SetRelAlarm(AlarmTypeId alarm_id, TickType offset, TickType cycle) {
     return E_OK;
 }
 
+/**
+ * @brief Set absolute alarm: activate at start, repeat by cycle
+ */
 uint8_t SetAbsAlarm(AlarmTypeId alarm_id, TickType start, TickType cycle) {
     if (alarm_id >= MAX_ALARMS) return E_OS_LIMIT;
 
@@ -166,6 +196,9 @@ uint8_t SetAbsAlarm(AlarmTypeId alarm_id, TickType start, TickType cycle) {
     return E_OK;
 }
 
+/**
+ * @brief Cancel alarm by ID
+ */
 uint8_t CancelAlarm(AlarmTypeId alarm_id) {
     if (alarm_id >= MAX_ALARMS) return E_OS_LIMIT;
 
@@ -174,6 +207,9 @@ uint8_t CancelAlarm(AlarmTypeId alarm_id) {
     return E_OK;
 }
 
+/**
+ * @brief Tick counter, check and trigger alarms
+ */
 void Counter_Tick(CounterTypeId cid) {
     CounterType *c = &counter_table[cid];
     c->current_value = (c->current_value + 1) % c->max_allowed_value;
@@ -206,11 +242,17 @@ void Counter_Tick(CounterTypeId cid) {
 // =====================
 // Demo & Utility Functions
 // =====================
+/**
+ * @brief Example callback for alarm
+ */
 void my_callback() {
     // Callback function example
     LedA_Toggle();  // Toggle LED A
 }
 
+/**
+ * @brief Setup demo alarms for testing
+ */
 void SetupAlarm_Demo() {
     AlarmTypeId alarm_id = 0;
     CounterTypeId counter_id = 0;
@@ -227,8 +269,7 @@ void SetupAlarm_Demo() {
     alarm_table[1].action_type = ALARMACTION_ACTIVATETASK;
     alarm_table[1].action.task_id = 1; // Activate Task Blink
 
-    // After 200ms call Task 1, repeat every 1000ms
     SetRelAlarm(0, 100, 250);
-    SetRelAlarm(1, 200, 5000); // Activate Alarm 1 after 200ms, repeat every 1000ms
+    SetRelAlarm(1, 200, 5000); 
 }
 

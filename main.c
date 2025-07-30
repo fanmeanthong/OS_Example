@@ -74,6 +74,9 @@ void Task_LEDControl(void);
 // =====================
 // SysTick Functions
 // =====================
+/**
+ * @brief Initialize SysTick timer for 1ms interrupt
+ */
 void SysTick_Init(void) {
     SYST_RVR = SYSTICK_LOAD_VAL;              // Reload value for 1ms
     SYST_CVR = 0;                             // Clear current value
@@ -82,6 +85,9 @@ void SysTick_Init(void) {
                SYSTICK_CTRL_CLKSRC;           // Enable SysTick + interrupt + processor clock
 }
 
+/**
+ * @brief SysTick interrupt handler, tick counter
+ */
 void SysTick_Handler(void) {
     Counter_Tick(0); // Assume Counter 0 is counter_1ms
 }
@@ -89,6 +95,9 @@ void SysTick_Handler(void) {
 // =====================
 // Utility Functions
 // =====================
+/**
+ * @brief Delay in milliseconds (approximate)
+ */
 void delay_ms(volatile uint32_t ms) {
     for (volatile uint32_t i = 0; i < ms * 8000; i++) {
         __asm volatile ("nop");
@@ -98,6 +107,9 @@ void delay_ms(volatile uint32_t ms) {
 // =====================
 // System Initialization
 // =====================
+/**
+ * @brief Configure system clock to 72MHz using PLL
+ */
 void SystemClock_Config(void)
 {
     // Enable HSE
@@ -129,6 +141,9 @@ void SystemClock_Config(void)
     while ((RCC_CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
 }
 
+/**
+ * @brief Initialize GPIO for LED and button
+ */
 void GPIO_InitAll(void) {
     // RCC Enable GPIOA và GPIOC
     RCC_APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
@@ -145,27 +160,48 @@ void GPIO_InitAll(void) {
     GPIO_CRL(GPIOA_BASE) &= ~(0xF << 4);      // Clear CNF1[1:0] + MODE1[1:0]
     GPIO_CRL(GPIOA_BASE) |=  (0x8 << 4);      // CNF1 = 10 (Input Pull-Up), MODE1 = 00
 
-    GPIO_ODR(GPIOA_BASE) |= (1 << 1);         // Kéo lên (bắt buộc cho Pull-Up)
+    GPIO_ODR(GPIOA_BASE) |= (1 << 1);         // Pull-Up
 }
 
 // =====================
 // LED Control Functions
 // =====================
+/**
+ * @brief Turn on LED at PC13
+ */
 void Led_On (void) {  GPIO_ODR(GPIOC_BASE)  = !(1 << 13); }
+/**
+ * @brief Turn off LED at PC13
+ */
 void Led_Off(void) {  GPIO_ODR(GPIOC_BASE) = (1 << 13); }
+/**
+ * @brief Turn on LED at PA0
+ */
 void LedA_On(void) { GPIO_ODR(GPIOA_BASE) |= (1 << 0); }
+/**
+ * @brief Turn off LED at PA0
+ */
 void LedA_Off(void) { GPIO_ODR(GPIOA_BASE) &= ~(1 << 0); }
+/**
+ * @brief Toggle LED at PA0
+ */
 void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
 
 // =====================
 // Task Implementations
 // =====================
+/**
+ * @brief Blink LED once and terminate task
+ */
 void Task_Blink(void) {
     Led_On();  delay_ms(250);
     Led_Off(); delay_ms(250);
     TerminateTask();  
 }
 
+/**
+ * @brief Poll button state and set event if pressed
+ */
 void Task_ButtonPoll(void) {
     static uint8_t last_state = 1;
     uint8_t now = (GPIO_IDR(GPIOA_BASE) & (1 << 1)) ? 1 : 0;
@@ -179,6 +215,9 @@ void Task_ButtonPoll(void) {
     ChainTask(TASK_BTN_POLL_ID);  // 
 }
 
+/**
+ * @brief Control LED when button event occurs
+ */
 void Task_LEDControl(void) {
     EventMaskType ev;
     WaitEvent(EVENT_BTN_PRESS);
@@ -197,6 +236,9 @@ void Task_LEDControl(void) {
 // =====================
 // Main Function
 // =====================
+/**
+ * @brief Main entry: system init, task setup, scheduler loop
+ */
 int main(void) {
     SystemClock_Config();
     GPIO_InitAll();

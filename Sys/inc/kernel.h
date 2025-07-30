@@ -66,6 +66,15 @@ typedef struct {
     EventMaskType WaitEventMask;   // Events the task is currently waiting for
 } TaskControlBlock;
 
+/**
+ * @brief Structure representing an alarm in the OS kernel.
+ *
+ * - state: Current state of the alarm (ACTIVE/INACTIVE).
+ * - expiry_tick: Tick value when the alarm expires.
+ * - cycle: Repeat interval; 0 for one-shot alarms.
+ * - action_type: Type of action to perform on expiry.
+ * - action: Action details (task activation, event setting, or callback).
+ */
 typedef struct {
     AlarmStateType state;              // ACTIVE / INACTIVE
     TickType expiry_tick;              // Expiry time (counter value)
@@ -80,7 +89,16 @@ typedef struct {
         void (*callback_fn)(void);     // For CALLBACK
     } action;
 } AlarmType;
-
+/**
+ * @brief Structure representing a hardware/software counter.
+ *
+ * - current_value: Current tick value of the counter.
+ * - max_allowed_value: Maximum tick value before wrap-around.
+ * - ticks_per_base: Number of real ticks per counter increment.
+ * - min_cycle: Minimum allowed cycle for alarms.
+ * - alarm_list: Array of pointers to alarms attached to this counter.
+ * - num_alarms: Number of alarms attached.
+ */ 
 typedef struct {
     TickType current_value;          // Current value of the counter
     TickType max_allowed_value;      // Maximum value before wrap-around
