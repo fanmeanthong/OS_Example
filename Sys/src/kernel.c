@@ -1,6 +1,8 @@
 #include "kernel.h"
 
-/* Bảng Task và biến lưu Task đang chạy */
+// =====================
+// Global Variables
+// =====================
 TaskControlBlock TaskTable[TASK_NUM];
 TaskType    currentTask = 0;
 
@@ -8,7 +10,6 @@ AlarmType alarm_table[MAX_ALARMS];
 CounterType* alarm_to_counter[MAX_ALARMS];
 
 #define COUNTER_NUM 2
-
 CounterType counter_table[COUNTER_NUM] = {
     // Counter 0 - counter_1ms
     {
@@ -28,7 +29,10 @@ CounterType counter_table[COUNTER_NUM] = {
     }
 };
 
-/* Khởi tạo OS: đặt tất cả Task về SUSPENDED, ActivationCount = 0 */
+// =====================
+// OS Core Functions
+// =====================
+/* Initialize OS: set all tasks to SUSPENDED, ActivationCount = 0 */
 void OS_Init(void) {
     for (int i = 0; i < TASK_NUM; i++) {
         TaskTable[i].state           = SUSPENDED;
@@ -37,7 +41,7 @@ void OS_Init(void) {
     }
 }
 
-/* ActivateTask: tăng đếm, nếu vượt giới hạn trả lỗi, chuyển SUSPENDED→READY */
+/* ActivateTask: increase count, if over limit return error, SUSPENDED→READY */
 uint8_t ActivateTask(TaskType id) {
     TaskControlBlock *t = &TaskTable[id];
 
@@ -47,7 +51,7 @@ uint8_t ActivateTask(TaskType id) {
 
     t->ActivationCount++;
 
-    // Quan trọng: nếu task đang SUSPENDED → đưa vào READY
+    // SUSPENDED → READY
     if (t->state == SUSPENDED) {
         t->state = READY;
     }
@@ -55,7 +59,7 @@ uint8_t ActivateTask(TaskType id) {
     return E_OK;
 }
 
-/* TerminateTask: giảm đếm, Task RUNNING→SUSPENDED, gọi scheduler ngay */
+/* TerminateTask: decrease count, RUNNING→SUSPENDED, call scheduler */
 uint8_t TerminateTask(void) {
     TaskControlBlock *t = &TaskTable[currentTask];
 
@@ -63,7 +67,7 @@ uint8_t TerminateTask(void) {
         t->ActivationCount--;
     }
 
-    // Nếu vẫn còn lượt activate → chuyển về READY
+    // Still activate → READY
     if (t->ActivationCount > 0) {
         t->state = READY;
     } else {
@@ -74,21 +78,20 @@ uint8_t TerminateTask(void) {
     return E_OK;
 }
 
-/* ChainTask: kết hợp Terminate + Activate */
+/* ChainTask: Terminate current and Activate another */
 uint8_t ChainTask(TaskType id) {
-    ActivateTask(id);        // Trước tiên đánh dấu task cần chạy
-    TerminateTask();         // Sau đó gỡ task hiện tại
+    ActivateTask(id);        // 
+    TerminateTask();         // 
     return E_OK;
 }
 
-/* GetTaskState: lấy trạng thái hiện tại của Task */
+/* GetTaskState: get current state of a task */
 uint8_t GetTaskState(TaskType id, TaskStateType *s) {
     *s = TaskTable[id].state;
     return E_OK;
 }
 
-/* Scheduler (co-operative round-robin):
-   duyệt lần lượt TASK_NUM task, chọn READY đầu tiên */
+/* Cooperative round-robin scheduler: pick first READY task */
 void OS_Schedule(void) {
     for (int i = 1; i <= TASK_NUM; i++) {
         TaskType idx = (currentTask + i) % TASK_NUM;
@@ -101,6 +104,9 @@ void OS_Schedule(void) {
     }
 }
 
+// =====================
+// Event Functions
+// =====================
 void WaitEvent(EventMaskType mask) {
     if ((TaskTable[currentTask].SetEventMask & mask) == 0) {
         TaskTable[currentTask].WaitEventMask = mask;
@@ -131,6 +137,9 @@ EventMaskType GetEvent(TaskType id, EventMaskType *event) {
     return E_OK;
 }
 
+// =====================
+// Alarm & Counter Functions
+// =====================
 uint8_t SetRelAlarm(AlarmTypeId alarm_id, TickType offset, TickType cycle) {
     if (alarm_id >= MAX_ALARMS || offset == 0) return E_OS_LIMIT;
 
@@ -193,10 +202,15 @@ void Counter_Tick(CounterTypeId cid) {
         }
     }
 }
+
+// =====================
+// Demo & Utility Functions
+// =====================
 void my_callback() {
     // Callback function example
     LedA_Toggle();  // Toggle LED A
 }
+
 void SetupAlarm_Demo() {
     AlarmTypeId alarm_id = 0;
     CounterTypeId counter_id = 0;
@@ -211,10 +225,10 @@ void SetupAlarm_Demo() {
     counter_table[counter_id].alarm_list[counter_table[counter_id].num_alarms++] = &alarm_table[1];
 
     alarm_table[1].action_type = ALARMACTION_ACTIVATETASK;
-    alarm_table[1].action.task_id = 1; // Kích hoạt Task Blink
+    alarm_table[1].action.task_id = 1; // Activate Task Blink
 
-    // Sau 200ms gọi Task 1, lặp lại mỗi 1000ms
+    // After 200ms call Task 1, repeat every 1000ms
     SetRelAlarm(0, 100, 250);
-    SetRelAlarm(1, 200, 5000); // Kích hoạt Alarm 1 sau 200ms, lặp lại mỗi 1000ms
+    SetRelAlarm(1, 200, 5000); // Activate Alarm 1 after 200ms, repeat every 1000ms
 }
 

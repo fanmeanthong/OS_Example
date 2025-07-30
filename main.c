@@ -2,24 +2,21 @@
 #include "stm32f10x.h"
 #include "kernel.h"
 #include "uart.h"
-extern TaskControlBlock TaskTable[TASK_NUM];
-extern TaskType   currentTask ;
-// =====================
-// Peripheral Base Address
-// =====================
-#define FLASH_BASE           ((uint32_t)0x40022000)
 
 // =====================
-// FLASH Register
+// External Variables
 // =====================
+extern TaskControlBlock TaskTable[TASK_NUM];
+extern TaskType   currentTask ;
+
+// =====================
+// Peripheral Base Address & Register Macros
+// =====================
+#define FLASH_BASE           ((uint32_t)0x40022000)
 #define FLASH_ACR            (*(volatile uint32_t *)(FLASH_BASE + 0x00))
 #define FLASH_ACR_PRFTBE     (1 << 4)
 #define FLASH_ACR_LATENCY_2  (2 << 0)
 #define FLASH_ACR_LATENCY    (0x7 << 0)
-
-// =====================
-// RCC Register
-// =====================
 #define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
 #define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
 #define RCC_CR_HSEON         (1 << 16)
@@ -37,10 +34,6 @@ extern TaskType   currentTask ;
 #define RCC_CFGR_PLLSRC      (1 << 16)
 #define RCC_CFGR_PLLMULL     (0xF << 18)
 #define RCC_CFGR_PLLMULL9    (0x7 << 18)
-
-// =====================
-// GPIO Register
-// =====================
 #define GPIO_CRL(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRL_OFFSET))
 #define GPIO_CRH(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRH_OFFSET))
 #define GPIO_ODR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_ODR_OFFSET))
@@ -49,26 +42,12 @@ extern TaskType   currentTask ;
 #define SYSTICK_CTRL_ENABLE  (1 << 0)
 #define SYSTICK_CTRL_TICKINT (1 << 1)
 #define SYSTICK_CTRL_CLKSRC  (1 << 2)
-
 #define SYST_CSR   (*(volatile uint32_t*)0xE000E010)
 #define SYST_RVR   (*(volatile uint32_t*)0xE000E014)
 #define SYST_CVR   (*(volatile uint32_t*)0xE000E018)
 
-void SysTick_Init(void) {
-    SYST_RVR = SYSTICK_LOAD_VAL;              // Reload value for 1ms
-    SYST_CVR = 0;                              // Clear current value
-    SYST_CSR = SYSTICK_CTRL_ENABLE |
-               SYSTICK_CTRL_TICKINT |
-               SYSTICK_CTRL_CLKSRC;           // Enable SysTick + interrupt + processor clock
-}
-
-void SysTick_Handler(void) {
-
-    Counter_Tick(0); // Giả sử Counter 0 là counter_1ms
-}
-
 // =====================
-// Event & Task Macro
+// Event & Task Macros
 // =====================
 #define EVENT_BTN_PRESS      (1U << 0)
 #define TASK_LED_CTRL_ID     0
@@ -76,7 +55,39 @@ void SysTick_Handler(void) {
 #define TASK_BTN_POLL_ID     2
 
 // =====================
-// Hàm delay theo ms
+// Function Prototypes
+// =====================
+void SysTick_Init(void);
+void SysTick_Handler(void);
+void delay_ms(volatile uint32_t ms);
+void SystemClock_Config(void);
+void GPIO_InitAll(void);
+void Led_On(void);
+void Led_Off(void);
+void LedA_On(void);
+void LedA_Off(void);
+void LedA_Toggle(void);
+void Task_Blink(void);
+void Task_ButtonPoll(void);
+void Task_LEDControl(void);
+
+// =====================
+// SysTick Functions
+// =====================
+void SysTick_Init(void) {
+    SYST_RVR = SYSTICK_LOAD_VAL;              // Reload value for 1ms
+    SYST_CVR = 0;                             // Clear current value
+    SYST_CSR = SYSTICK_CTRL_ENABLE |
+               SYSTICK_CTRL_TICKINT |
+               SYSTICK_CTRL_CLKSRC;           // Enable SysTick + interrupt + processor clock
+}
+
+void SysTick_Handler(void) {
+    Counter_Tick(0); // Assume Counter 0 is counter_1ms
+}
+
+// =====================
+// Utility Functions
 // =====================
 void delay_ms(volatile uint32_t ms) {
     for (volatile uint32_t i = 0; i < ms * 8000; i++) {
@@ -85,7 +96,7 @@ void delay_ms(volatile uint32_t ms) {
 }
 
 // =====================
-// Cấu hình clock hệ thống 72MHz
+// System Initialization
 // =====================
 void SystemClock_Config(void)
 {
@@ -118,11 +129,8 @@ void SystemClock_Config(void)
     while ((RCC_CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
 }
 
-// =====================
-// Khởi tạo GPIO cho LED và nút nhấn
-// =====================
 void GPIO_InitAll(void) {
-    // Bật xung cho GPIOA và GPIOC
+    // RCC Enable GPIOA và GPIOC
     RCC_APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
 
     // PC13: Output Push-Pull 2MHz (LED nháy)
@@ -141,44 +149,26 @@ void GPIO_InitAll(void) {
 }
 
 // =====================
-// Bật LED trên PC13
+// LED Control Functions
 // =====================
 void Led_On (void) {  GPIO_ODR(GPIOC_BASE)  = !(1 << 13); }
-// =====================
-// Tắt LED trên PC13
-// =====================
 void Led_Off(void) {  GPIO_ODR(GPIOC_BASE) = (1 << 13); }
-// =====================
-// Bật LED trên PA0
-// =====================
 void LedA_On(void) { GPIO_ODR(GPIOA_BASE) |= (1 << 0); }
-// =====================
-// Tắt LED trên PA0
-// =====================
 void LedA_Off(void) { GPIO_ODR(GPIOA_BASE) &= ~(1 << 0); }
-// =====================
-// Đảo trạng thái LED trên PA0
-// =====================
 void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
 
 // =====================
-// Task: Blink LED 10 lần rồi dừng
+// Task Implementations
 // =====================
 void Task_Blink(void) {
-    //for(int i = 0; i < 5; i++) {
-        Led_On();  delay_ms(250);
-        Led_Off(); delay_ms(250);
-    //}
-        TerminateTask();  
+    Led_On();  delay_ms(250);
+    Led_Off(); delay_ms(250);
+    TerminateTask();  
 }
 
-// =====================
-// Task: Poll trạng thái nút nhấn
-// =====================
 void Task_ButtonPoll(void) {
     static uint8_t last_state = 1;
     uint8_t now = (GPIO_IDR(GPIOA_BASE) & (1 << 1)) ? 1 : 0;
-
     if (last_state == 1 && now == 0) {
         delay_ms(20);  // debounce
         if ((GPIO_IDR(GPIOA_BASE) & (1 << 1)) == 0) {
@@ -189,14 +179,10 @@ void Task_ButtonPoll(void) {
     ChainTask(TASK_BTN_POLL_ID);  // 
 }
 
-// =====================
-// Task: Điều khiển LED khi có sự kiện nút nhấn
-// =====================
 void Task_LEDControl(void) {
     EventMaskType ev;
     WaitEvent(EVENT_BTN_PRESS);
     GetEvent(currentTask, &ev);
-
     if (ev & EVENT_BTN_PRESS) {
         Led_On();  
         delay_ms(500);
@@ -209,20 +195,16 @@ void Task_LEDControl(void) {
 }
 
 // =====================
-// Hàm main: Khởi tạo hệ thống và chạy OS
+// Main Function
 // =====================
 int main(void) {
     SystemClock_Config();
     GPIO_InitAll();
     SysTick_Init();
     OS_Init();
-
-    // Khởi tạo Task Table
     TaskTable[TASK_LED_CTRL_ID] = (TaskControlBlock){TASK_LED_CTRL_ID, Task_LEDControl, SUSPENDED, 1, 0, 2};
     TaskTable[TASK_BLINK_ID]    = (TaskControlBlock){TASK_BLINK_ID,    Task_Blink,      SUSPENDED, 1, 0, 2};
     TaskTable[TASK_BTN_POLL_ID] = (TaskControlBlock){TASK_BTN_POLL_ID, Task_ButtonPoll, SUSPENDED, 1, 0, 2};
-
-    // Khởi động ban đầu các task
     SetupAlarm_Demo();
     while (1) {
         OS_Schedule();
