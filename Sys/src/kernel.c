@@ -207,6 +207,29 @@ uint8_t CancelAlarm(AlarmTypeId alarm_id) {
     return E_OK;
 }
 
+
+uint8_t GetAlarm(AlarmTypeId alarm_id, TickType *tick_left) {
+    if (alarm_id >= MAX_ALARMS) return E_OS_LIMIT;
+
+    AlarmType *a = &alarm_table[alarm_id];
+    CounterType *c = alarm_to_counter[alarm_id];
+
+    if (a->state == ALARMSTATE_INACTIVE) {
+        *tick_left = 0;
+        return E_OS_LIMIT;
+    }
+
+    TickType now = c->current_value;
+    
+    // Trường hợp không bị tràn
+    if (a->expiry_tick >= now)
+        *tick_left = a->expiry_tick - now;
+    else
+        // Trường hợp expiry_tick đã vòng lại (do Counter quay vòng)
+        *tick_left = (c->max_allowed_value - now + a->expiry_tick);
+
+    return E_OK;
+}
 /**
  * @brief Tick counter, check and trigger alarms
  */
