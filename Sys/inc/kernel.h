@@ -133,47 +133,6 @@ typedef struct {
     uint8_t num_alarms;              // Number of attached alarms
 } CounterType;
 
-/**
- * @brief Structure representing an expiry point in a schedule table.
- *
- * Defines an expiry point with an offset and an associated action
- * (activate task, set event, or callback) to be performed when the expiry is reached.
- */
-typedef struct {
-    TickType offset;  // Offset from start time
-    enum { SCH_ACTIVATETASK, SCH_SETEVENT, SCH_CALLBACK } action_type; // Action type for expiry point
-    union {
-        TaskType task_id; // For ACTIVATE_TASK
-        struct {
-            TaskType task_id;
-            EventMaskType event;
-        } set_event; // For SET_EVENT
-        void (*callback_fn)(void); // For CALLBACK
-    } action;
-} ExpiryPoint;
-
-/**
- * @brief Structure representing a schedule table for time-triggered actions.
- *
- * - active: Whether the schedule table is active
- * - start_time: Start time of the schedule table
- * - duration: Total duration of the schedule table
- * - cyclic: Whether the schedule table is cyclic
- * - current_ep: Current expiry point index
- * - num_eps: Number of expiry points
- * - eps: Array of expiry points
- * - counter: Pointer to the associated counter
- */
-typedef struct {
-    uint8_t active;           // Schedule table active flag
-    TickType start_time;      // Start time
-    TickType duration;        // Total duration
-    uint8_t cyclic;           // Cyclic flag
-    uint8_t current_ep;       // Current expiry point index
-    uint8_t num_eps;          // Number of expiry points
-    ExpiryPoint eps[MAX_EXPIRY_POINTS]; // Array of expiry points
-    CounterType* counter;     // Associated counter
-} ScheduleTableType;
 
 // =====================
 // API Prototypes

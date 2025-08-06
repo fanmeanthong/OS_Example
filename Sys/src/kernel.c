@@ -207,7 +207,6 @@ uint8_t CancelAlarm(AlarmTypeId alarm_id) {
     return E_OK;
 }
 
-
 uint8_t GetAlarm(AlarmTypeId alarm_id, TickType *tick_left) {
     if (alarm_id >= MAX_ALARMS) return E_OS_LIMIT;
 
@@ -230,6 +229,7 @@ uint8_t GetAlarm(AlarmTypeId alarm_id, TickType *tick_left) {
 
     return E_OK;
 }
+
 /**
  * @brief Tick counter, check and trigger alarms
  */
