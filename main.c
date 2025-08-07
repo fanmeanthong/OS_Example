@@ -169,6 +169,9 @@ void GPIO_InitAll(void) {
 /**
  * @brief Turn on LED at PC13
  */
+void Led_Toggle(void) {
+    GPIO_ODR(GPIOC_BASE) ^= (1 << 13); // Toggle PC13
+}
 void Led_On (void) {  GPIO_ODR(GPIOC_BASE)  = !(1 << 13); }
 /**
  * @brief Turn off LED at PC13
@@ -247,7 +250,9 @@ int main(void) {
     TaskTable[TASK_LED_CTRL_ID] = (TaskControlBlock){TASK_LED_CTRL_ID, Task_LEDControl, SUSPENDED, 1, 0, 2};
     TaskTable[TASK_BLINK_ID]    = (TaskControlBlock){TASK_BLINK_ID,    Task_Blink,      SUSPENDED, 1, 0, 2};
     TaskTable[TASK_BTN_POLL_ID] = (TaskControlBlock){TASK_BTN_POLL_ID, Task_ButtonPoll, SUSPENDED, 1, 0, 2};
-    SetupAlarm_Demo();
+    //SetupAlarm_Demo();
+    SetupScheduleTable_Demo();
+    StartScheduleTableRel(0, 50);
     while (1) {
         OS_Schedule();
     }

@@ -39,6 +39,8 @@ typedef enum {
 // =====================
 #define TASK_NUM 3        // Number of tasks in the system
 #define MAX_ALARMS 10     // Maximum number of alarms per counter
+#define MAX_SCHEDULETABLES 4   // Maximum number of schedule tables
+#define MAX_EXPIRY_POINTS  8   // Maximum num ber of expiry points per schedule table
 
 // =====================
 // Error Codes
@@ -108,6 +110,36 @@ typedef struct {
     uint8_t num_alarms;              // Number of attached alarms
 } CounterType;
 
+/**
+ * @brief Expiry point for schedule table (offset + action)
+ */
+typedef struct {
+    TickType offset;  // Offset from start time
+    enum { SCH_ACTIVATETASK, SCH_SETEVENT, SCH_CALLBACK } action_type; // Action type
+    union {
+        TaskType task_id; // For ACTIVATE_TASK
+        struct {
+            TaskType task_id;
+            EventMaskType event;
+        } set_event; // For SET_EVENT
+        void (*callback_fn)(void); // For CALLBACK
+    } action;
+} ExpiryPoint;
+
+/**
+ * @brief Schedule table for time-triggered actions
+ */
+typedef struct {
+    uint8_t active;                        // 1 if table is active, 0 otherwise
+    TickType start_time;                   // Start time of the schedule table
+    TickType duration;                     // Total duration of the schedule table
+    uint8_t cyclic;                        // 1 if cyclic, 0 if one-shot
+    uint8_t current_ep;                    // Current expiry point index
+    uint8_t num_eps;                       // Number of expiry points
+    ExpiryPoint eps[MAX_EXPIRY_POINTS];    // Array of expiry points
+    CounterType* counter;                  // Associated counter
+} ScheduleTableType;
+
 // =====================
 // API Prototypes
 // =====================
@@ -127,6 +159,15 @@ void Counter_Tick(CounterTypeId cid);
 uint8_t SetRelAlarm(AlarmTypeId alarm_id, TickType offset, TickType cycle);
 uint8_t SetAbsAlarm(AlarmTypeId alarm_id, TickType start, TickType cycle);
 uint8_t CancelAlarm(AlarmTypeId alarm_id);
+
+uint8_t StartScheduleTableRel(uint8_t table_id, TickType offset);
+uint8_t StartScheduleTableAbs(uint8_t table_id, TickType start);
+uint8_t StopScheduleTable(uint8_t table_id);
+uint8_t SyncScheduleTable(uint8_t table_id, TickType new_start_offset);
+
+void ScheduleTable_Tick(CounterTypeId cid); 
+
+void SetupScheduleTable_Demo(void) ;
 void SetupAlarm_Demo();
 void my_callback();
 

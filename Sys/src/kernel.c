@@ -30,6 +30,18 @@ CounterType counter_table[COUNTER_NUM] = {
 };
 
 // =====================
+// Schedule Table Variables
+// =====================
+/**
+ * @brief Global array of schedule tables
+ */
+ScheduleTableType schedule_table_list[MAX_SCHEDULETABLES];
+/**
+ * @brief Number of schedule tables in use
+ */
+uint8_t schedule_table_count = 0;
+
+// =====================
 // OS Core Functions
 // =====================
 /**
@@ -207,6 +219,7 @@ uint8_t CancelAlarm(AlarmTypeId alarm_id) {
     return E_OK;
 }
 
+
 /**
  * @brief Tick counter, check and trigger alarms
  */
@@ -237,6 +250,7 @@ void Counter_Tick(CounterTypeId cid) {
             }
         }
     }
+    ScheduleTable_Tick(cid); // Check schedule tables on each counter tick
 }
 
 // =====================
@@ -249,7 +263,10 @@ void my_callback() {
     // Callback function example
     LedA_Toggle();  // Toggle LED A
 }
-
+void my_callback1() {
+    // Callback function example
+    Led_Toggle();  // Toggle LED PC13
+}
 /**
  * @brief Setup demo alarms for testing
  */
@@ -273,3 +290,119 @@ void SetupAlarm_Demo() {
     SetRelAlarm(1, 200, 5000); 
 }
 
+// =====================
+// Schedule Table Functions
+// =====================
+
+/**
+ * @brief Start a schedule table at a relative offset
+ */
+uint8_t StartScheduleTableRel(uint8_t table_id, TickType offset) {
+    if (table_id >= MAX_SCHEDULETABLES || schedule_table_list[table_id].active)
+        return E_OS_LIMIT;
+
+    ScheduleTableType *tbl = &schedule_table_list[table_id];
+    tbl->start_time = (tbl->counter->current_value + offset) % tbl->counter->max_allowed_value;
+    tbl->current_ep = 0;
+    tbl->active = 1;
+
+    return E_OK;
+}
+
+/**
+ * @brief Start a schedule table at an absolute start time
+ */
+uint8_t StartScheduleTableAbs(uint8_t table_id, TickType start) {
+    if (table_id >= MAX_SCHEDULETABLES || schedule_table_list[table_id].active)
+        return E_OS_LIMIT;
+
+    ScheduleTableType *tbl = &schedule_table_list[table_id];
+    tbl->start_time = start % tbl->counter->max_allowed_value;
+    tbl->current_ep = 0;
+    tbl->active = 1;
+
+    return E_OK;
+}
+
+/**
+ * @brief Stop a running schedule table
+ */
+uint8_t StopScheduleTable(uint8_t table_id) {
+    if (table_id >= MAX_SCHEDULETABLES) return E_OS_LIMIT;
+
+    schedule_table_list[table_id].active = 0;
+    schedule_table_list[table_id].current_ep = 0;
+
+    return E_OK;
+}
+
+/**
+ * @brief Synchronize a running schedule table to a new offset
+ */
+uint8_t SyncScheduleTable(uint8_t table_id, TickType new_start_offset) {
+    if (table_id >= MAX_SCHEDULETABLES) return E_OS_LIMIT;
+
+    ScheduleTableType *tbl = &schedule_table_list[table_id];
+    tbl->start_time = (tbl->counter->current_value + new_start_offset) % tbl->counter->max_allowed_value;
+    tbl->current_ep = 0;
+    return E_OK;
+}
+
+/**
+ * @brief Tick handler for schedule tables, check and execute expiry points
+ */
+void ScheduleTable_Tick(CounterTypeId cid) {
+    for (int i = 0; i < MAX_SCHEDULETABLES; i++) {
+        ScheduleTableType *tbl = &schedule_table_list[i];
+
+        if (!tbl->active || tbl->counter != &counter_table[cid]) continue;
+
+    TickType rel_time = (tbl->counter->current_value + tbl->counter->max_allowed_value - tbl->start_time) % tbl->counter->max_allowed_value;
+
+        while (tbl->current_ep < tbl->num_eps &&
+               tbl->eps[tbl->current_ep].offset <= rel_time) {
+
+            ExpiryPoint *ep = &tbl->eps[tbl->current_ep];
+
+            switch (ep->action_type) {
+                case SCH_ACTIVATETASK:
+                    ActivateTask(ep->action.task_id);
+                    break;
+                case SCH_SETEVENT:
+                    SetEvent(ep->action.set_event.task_id, ep->action.set_event.event);
+                    break;
+                case SCH_CALLBACK:
+                    ep->action.callback_fn();
+                    break;
+            }
+
+            tbl->current_ep++;
+        }
+
+        if (rel_time >= tbl->duration) {
+            if (tbl->cyclic) {
+                tbl->start_time = tbl->counter->current_value;
+                tbl->current_ep = 0;
+            } else {
+                tbl->active = 0;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Setup a demo schedule table with expiry points
+ */
+void SetupScheduleTable_Demo(void) {
+    ScheduleTableType *tbl = &schedule_table_list[0];
+
+    tbl->cyclic = 1;
+    tbl->duration = 5000;
+    tbl->num_eps = 3;
+    tbl->counter = &counter_table[0];  // Counter 1ms
+    tbl->eps[0] = (ExpiryPoint){.offset = 200, .action_type = SCH_ACTIVATETASK, .action.task_id = 1};
+    tbl->eps[1] = (ExpiryPoint){.offset = 400, .action_type = SCH_CALLBACK, .action.callback_fn = my_callback1};
+    tbl->eps[2] = (ExpiryPoint){.offset = 800, .action_type = SCH_CALLBACK, .action.callback_fn = my_callback};
+
+    schedule_table_count++;
+}
