@@ -1,0 +1,8 @@
+# Build files
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+# Debug files
+*.dmp
