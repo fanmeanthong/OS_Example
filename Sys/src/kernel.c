@@ -374,17 +374,17 @@ void ScheduleTable_Tick(CounterTypeId cid) {
         TickType cur = c->current_value;
         TickType max = c->max_allowed_value;
 
-        // Khoảng thời gian đã trôi qua kể từ start_time (đã xử lý wrap)
+        // Khoảng thời gian kể từ start_time (xử lý wrap)
         TickType elapsed_from_start = diff_wrap(cur, t->start_time, max);
 
-        // 1) Bảng đang chờ start, nhưng có thể đã trễ tick start_time
+        // 1) Đang chờ start, có thể đã trễ tick start_time
         if (t->state == ST_WAITING_START) {
             if (elapsed_from_start < t->duration) {
-                // Đã tới (hoặc đã vượt qua) mốc start trong phạm vi chu kỳ hiện tại
+                // Đã tới (hoặc qua) mốc start trong chu kỳ hiện tại
                 t->state = ST_RUNNING;
                 t->current_ep = 0;
 
-                // Catch-up: chạy mọi EP có offset <= elapsed_from_start (kể cả offset=0)
+                // Catch-up: chạy mọi EP có offset <= elapsed_from_start
                 while (t->current_ep < t->num_eps &&
                        t->eps[t->current_ep].offset <= elapsed_from_start) {
                     ExpiryPoint *ep = &t->eps[t->current_ep];
@@ -394,22 +394,22 @@ void ScheduleTable_Tick(CounterTypeId cid) {
                     t->current_ep++;
                 }
             } else {
-                // Bị lỡ nguyên 1 (hoặc nhiều) chu kỳ mà chưa start
+                // Bị lỡ cả 1 (hoặc nhiều) chu kỳ mà chưa start
                 if (t->cyclic) {
                     TickType periods_skipped = elapsed_from_start / t->duration;
                     t->start_time = (t->start_time + periods_skipped * t->duration) % max;
-                    // vẫn WAITING_START, lần tick sau sẽ vào cửa sổ mới
+                    // vẫn WAITING_START
                 } else {
                     t->state = ST_STOPPED;
                     t->current_ep = 0;
                 }
             }
-            continue; // xong bảng này
+            continue;
         }
 
         // 2) RUNNING: xử lý EP và kết thúc chu kỳ nếu tới hạn
         if (t->state == ST_RUNNING) {
-            // Catch-up mọi EP có offset <= elapsed
+            // Catch-up các EP có offset <= elapsed
             while (t->current_ep < t->num_eps &&
                    t->eps[t->current_ep].offset <= elapsed_from_start) {
                 ExpiryPoint *ep = &t->eps[t->current_ep];
@@ -419,7 +419,7 @@ void ScheduleTable_Tick(CounterTypeId cid) {
                 t->current_ep++;
             }
 
-            // Hết chu kỳ (hoặc vượt quá do trễ) → chuẩn bị chu kỳ mới
+            // Hết chu kỳ (hoặc vượt vì trễ) → chuẩn bị chu kỳ mới
             if (elapsed_from_start >= t->duration) {
                 if (t->cyclic) {
                     TickType periods = elapsed_from_start / t->duration;
@@ -427,7 +427,7 @@ void ScheduleTable_Tick(CounterTypeId cid) {
                     t->current_ep = 0;
                     t->state      = ST_WAITING_START;
 
-                    // Trường hợp cùng tick đã bước vào cửa sổ chu kỳ mới → start luôn & catch-up
+                    // Trường hợp cùng tick → start luôn & catch-up
                     TickType e2 = diff_wrap(cur, t->start_time, max);
                     if (e2 < t->duration) {
                         t->state = ST_RUNNING;

@@ -55,6 +55,7 @@ typedef enum {
 // =====================
 // Struct Definitions
 // =====================
+
 /**
  * @brief Task control block: holds all info for a task
  */

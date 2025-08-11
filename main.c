@@ -166,6 +166,7 @@ void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
 // =====================
 // Task Implementations
 // =====================
+
 /**
  * @brief Blink LED once and terminate task
  */

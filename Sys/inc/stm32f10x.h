@@ -41,21 +41,42 @@
 // =====================
 // RCC Register Macros
 // =====================
-#define RCC_APB2ENR           (*(volatile uint32_t*)(RCC_BASE + 0x18))
-#define RCC_APB1ENR           (*(volatile uint32_t*)(RCC_BASE + 0x1C))
-#define RCC_APB2ENR_IOPAEN    ((uint32_t)0x00000004)
-#define RCC_APB2ENR_IOPBEN    ((uint32_t)0x00000008)
-#define RCC_APB2ENR_IOPCEN    ((uint32_t)0x00000010)
-#define RCC_APB2ENR_AFIOEN    ((uint32_t)0x00000001)
-#define RCC_APB2ENR_USART1EN  ((uint32_t)0x00004000)
-#define RCC_APB2ENR_SPI1EN    ((uint32_t)0x00001000)
-#define RCC_APB1ENR_USART2EN  ((uint32_t)0x00020000)
-#define RCC_APB1ENR_USART3EN  ((uint32_t)0x00040000)
-#define RCC_APB1ENR_SPI2EN    ((uint32_t)0x00004000)
-#define RCC_APB1ENR_I2C1EN    ((uint32_t)0x00200000)
-#define RCC_APB1ENR_I2C2EN    ((uint32_t)0x00400000)
-#define RCC_APB1ENR_CAN1EN    ((uint32_t)0x02000000)
-#define RCC_APB1ENR_CAN2EN    ((uint32_t)0x04000000)
+#define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
+#define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
+#define RCC_CR_HSEON         (1 << 16)
+#define RCC_CR_HSERDY        (1 << 17)
+#define RCC_CR_PLLON         (1 << 24)
+#define RCC_CR_PLLRDY        (1 << 25)
+#define RCC_CFGR_SW          (0x3 << 0)
+#define RCC_CFGR_SW_PLL      (0x2 << 0)
+#define RCC_CFGR_SWS         (0x3 << 2)
+#define RCC_CFGR_SWS_PLL     (0x2 << 2)
+#define RCC_CFGR_HPRE        (0xF << 4)
+#define RCC_CFGR_PPRE1       (0x7 << 8)
+#define RCC_CFGR_PPRE2       (0x7 << 11)
+#define RCC_CFGR_PPRE1_DIV2  (0x4 << 8)
+#define RCC_CFGR_PLLSRC      (1 << 16)
+#define RCC_CFGR_PLLMULL     (0xF << 18)
+#define RCC_CFGR_PLLMULL9    (0x7 << 18)
+
+// =====================
+// RCC Register Bit Masks (Enable Peripherals)
+// =====================
+#define RCC_APB2ENR           (*(volatile uint32_t*)(RCC_BASE + 0x18))   // APB2 peripheral clock enable register
+#define RCC_APB1ENR           (*(volatile uint32_t*)(RCC_BASE + 0x1C))   // APB1 peripheral clock enable register
+#define RCC_APB2ENR_IOPAEN    ((uint32_t)0x00000004) // Enable GPIOA clock
+#define RCC_APB2ENR_IOPBEN    ((uint32_t)0x00000008) // Enable GPIOB clock
+#define RCC_APB2ENR_IOPCEN    ((uint32_t)0x00000010) // Enable GPIOC clock
+#define RCC_APB2ENR_AFIOEN    ((uint32_t)0x00000001) // Enable AFIO clock
+#define RCC_APB2ENR_USART1EN  ((uint32_t)0x00004000) // Enable USART1 clock
+#define RCC_APB2ENR_SPI1EN    ((uint32_t)0x00001000) // Enable SPI1 clock
+#define RCC_APB1ENR_USART2EN  ((uint32_t)0x00020000) // Enable USART2 clock
+#define RCC_APB1ENR_USART3EN  ((uint32_t)0x00040000) // Enable USART3 clock
+#define RCC_APB1ENR_SPI2EN    ((uint32_t)0x00004000) // Enable SPI2 clock
+#define RCC_APB1ENR_I2C1EN    ((uint32_t)0x00200000) // Enable I2C1 clock
+#define RCC_APB1ENR_I2C2EN    ((uint32_t)0x00400000) // Enable I2C2 clock
+#define RCC_APB1ENR_CAN1EN    ((uint32_t)0x02000000) // Enable CAN1 clock
+#define RCC_APB1ENR_CAN2EN    ((uint32_t)0x04000000) // Enable CAN2 clock
 
 // =====================
 // SCB Register Macros
@@ -74,23 +95,6 @@
 #define FLASH_ACR_PRFTBE     (1 << 4)
 #define FLASH_ACR_LATENCY_2  (2 << 0)
 #define FLASH_ACR_LATENCY    (0x7 << 0)
-#define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
-#define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
-#define RCC_CR_HSEON         (1 << 16)
-#define RCC_CR_HSERDY        (1 << 17)
-#define RCC_CR_PLLON         (1 << 24)
-#define RCC_CR_PLLRDY        (1 << 25)
-#define RCC_CFGR_SW          (0x3 << 0)
-#define RCC_CFGR_SW_PLL      (0x2 << 0)
-#define RCC_CFGR_SWS         (0x3 << 2)
-#define RCC_CFGR_SWS_PLL     (0x2 << 2)
-#define RCC_CFGR_HPRE        (0xF << 4)
-#define RCC_CFGR_PPRE1       (0x7 << 8)
-#define RCC_CFGR_PPRE2       (0x7 << 11)
-#define RCC_CFGR_PPRE1_DIV2  (0x4 << 8)
-#define RCC_CFGR_PLLSRC      (1 << 16)
-#define RCC_CFGR_PLLMULL     (0xF << 18)
-#define RCC_CFGR_PLLMULL9    (0x7 << 18)
 #define GPIO_CRL(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRL_OFFSET))
 #define GPIO_CRH(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRH_OFFSET))
 #define GPIO_ODR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_ODR_OFFSET))
@@ -104,3 +108,4 @@
 #define SYST_CVR   (*(volatile uint32_t*)0xE000E018)
 #define ICSR_PENDSVSET (1u << 28)
 #endif // __STM32F10X_H
+
