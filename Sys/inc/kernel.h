@@ -43,19 +43,20 @@ typedef enum {
 #define MAX_EXPIRY_POINTS  8   // Maximum num ber of expiry points per schedule table
 
 // =====================
-// Error Codes
+// Error Codes (OSEK-style)
 // =====================
-#define E_OK       0
-#define E_OS_LIMIT 1
+#define E_OK        0u      // No error
+#define E_OS_ID     1u      // Invalid ID
+#define E_OS_STATE  2u      // Invalid state
+#define E_OS_VALUE  3u      // Invalid value
+#define E_OS_NOFUNC 4u      // No action performed
+#define E_OS_LIMIT  5u      // Limit exceeded
 
 // =====================
 // Struct Definitions
 // =====================
 /**
- * @brief Structure representing the control block for a task in the operating system.
- *
- * This structure holds all relevant information about a task, including its identifier,
- * entry function, current state, priority, activation count, activation limit, and event masks.
+ * @brief Task control block: holds all info for a task
  */
 typedef struct {
     TaskType id;                   // Task ID
@@ -69,13 +70,12 @@ typedef struct {
 } TaskControlBlock;
 
 /**
- * @brief Structure representing an alarm in the OS kernel.
- *
- * - state: Current state of the alarm (ACTIVE/INACTIVE).
- * - expiry_tick: Tick value when the alarm expires.
- * - cycle: Repeat interval; 0 for one-shot alarms.
- * - action_type: Type of action to perform on expiry.
- * - action: Action details (task activation, event setting, or callback).
+ * @brief Schedule table state
+ */
+typedef enum { ST_STOPPED=0, ST_WAITING_START, ST_RUNNING } ScheduleTableState;
+
+/**
+ * @brief Alarm structure: describes an alarm and its action
  */
 typedef struct {
     AlarmStateType state;              // ACTIVE / INACTIVE
@@ -91,16 +91,10 @@ typedef struct {
         void (*callback_fn)(void);     // For CALLBACK
     } action;
 } AlarmType;
+
 /**
- * @brief Structure representing a hardware/software counter.
- *
- * - current_value: Current tick value of the counter.
- * - max_allowed_value: Maximum tick value before wrap-around.
- * - ticks_per_base: Number of real ticks per counter increment.
- * - min_cycle: Minimum allowed cycle for alarms.
- * - alarm_list: Array of pointers to alarms attached to this counter.
- * - num_alarms: Number of alarms attached.
- */ 
+ * @brief Counter structure: describes a hardware/software counter
+ */
 typedef struct {
     TickType current_value;          // Current value of the counter
     TickType max_allowed_value;      // Maximum value before wrap-around
@@ -138,6 +132,7 @@ typedef struct {
     uint8_t num_eps;                       // Number of expiry points
     ExpiryPoint eps[MAX_EXPIRY_POINTS];    // Array of expiry points
     CounterType* counter;                  // Associated counter
+    ScheduleTableState state;              // State of the schedule table
 } ScheduleTableType;
 
 // =====================
@@ -170,5 +165,7 @@ void ScheduleTable_Tick(CounterTypeId cid);
 void SetupScheduleTable_Demo(void) ;
 void SetupAlarm_Demo();
 void my_callback();
+
+void OS_RequestSchedule(void);
 
 #endif // __KERNEL_H

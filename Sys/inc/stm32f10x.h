@@ -66,5 +66,41 @@
 #define PENDSV_PRIO_MASK    (0xFF << PENDSV_PRIO_SHIFT)
 #define SCB_ICSR           (*(volatile uint32_t *)(0xE000ED04UL))  // Interrupt Control and State Register
 #define SCB_ICSR_PENDSVSET (1 << 28)                               // Set-pending PendSV bit
-
+// =====================
+// Peripheral Base Address & Register Macros
+// =====================
+#define FLASH_BASE           ((uint32_t)0x40022000)
+#define FLASH_ACR            (*(volatile uint32_t *)(FLASH_BASE + 0x00))
+#define FLASH_ACR_PRFTBE     (1 << 4)
+#define FLASH_ACR_LATENCY_2  (2 << 0)
+#define FLASH_ACR_LATENCY    (0x7 << 0)
+#define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
+#define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
+#define RCC_CR_HSEON         (1 << 16)
+#define RCC_CR_HSERDY        (1 << 17)
+#define RCC_CR_PLLON         (1 << 24)
+#define RCC_CR_PLLRDY        (1 << 25)
+#define RCC_CFGR_SW          (0x3 << 0)
+#define RCC_CFGR_SW_PLL      (0x2 << 0)
+#define RCC_CFGR_SWS         (0x3 << 2)
+#define RCC_CFGR_SWS_PLL     (0x2 << 2)
+#define RCC_CFGR_HPRE        (0xF << 4)
+#define RCC_CFGR_PPRE1       (0x7 << 8)
+#define RCC_CFGR_PPRE2       (0x7 << 11)
+#define RCC_CFGR_PPRE1_DIV2  (0x4 << 8)
+#define RCC_CFGR_PLLSRC      (1 << 16)
+#define RCC_CFGR_PLLMULL     (0xF << 18)
+#define RCC_CFGR_PLLMULL9    (0x7 << 18)
+#define GPIO_CRL(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRL_OFFSET))
+#define GPIO_CRH(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRH_OFFSET))
+#define GPIO_ODR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_ODR_OFFSET))
+#define GPIO_IDR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_IDR_OFFSET))
+#define SYSTICK_LOAD_VAL     (72000 - 1) // 72MHz / 1000 = 1ms
+#define SYSTICK_CTRL_ENABLE  (1 << 0)
+#define SYSTICK_CTRL_TICKINT (1 << 1)
+#define SYSTICK_CTRL_CLKSRC  (1 << 2)
+#define SYST_CSR   (*(volatile uint32_t*)0xE000E010)
+#define SYST_RVR   (*(volatile uint32_t*)0xE000E014)
+#define SYST_CVR   (*(volatile uint32_t*)0xE000E018)
+#define ICSR_PENDSVSET (1u << 28)
 #endif // __STM32F10X_H

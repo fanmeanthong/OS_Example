@@ -71,7 +71,7 @@ uint8_t ActivateTask(TaskType id) {
     if (t->state == SUSPENDED) {
         t->state = READY;
     }
-
+    OS_RequestSchedule(); 
     return E_OK;
 }
 
@@ -152,11 +152,12 @@ void SetEvent(uint8_t task_id, EventMaskType mask) {
 
     if (TaskTable[task_id].state == WAITING &&
         (TaskTable[task_id].SetEventMask & TaskTable[task_id].WaitEventMask)) {
-        
         TaskTable[task_id].state = READY;
         TaskTable[task_id].WaitEventMask = 0;
+        OS_RequestSchedule();           
     }
 }
+
 
 /**
  * @brief Clear event mask for current task
@@ -180,44 +181,44 @@ EventMaskType GetEvent(TaskType id, EventMaskType *event) {
  * @brief Set relative alarm: activate after offset, repeat by cycle
  */
 uint8_t SetRelAlarm(AlarmTypeId alarm_id, TickType offset, TickType cycle) {
-    if (alarm_id >= MAX_ALARMS || offset == 0) return E_OS_LIMIT;
+    if (alarm_id >= MAX_ALARMS) return E_OS_ID;
+    if (offset == 0)            return E_OS_VALUE;
 
     AlarmType *a = &alarm_table[alarm_id];
     CounterType *c = alarm_to_counter[alarm_id];
+    if (!c) return E_OS_STATE;
+
+    if (cycle && cycle < c->min_cycle) return E_OS_VALUE;
 
     a->state = ALARMSTATE_ACTIVE;
     a->expiry_tick = (c->current_value + offset) % c->max_allowed_value;
     a->cycle = cycle;
-
     return E_OK;
 }
 
-/**
- * @brief Set absolute alarm: activate at start, repeat by cycle
- */
 uint8_t SetAbsAlarm(AlarmTypeId alarm_id, TickType start, TickType cycle) {
-    if (alarm_id >= MAX_ALARMS) return E_OS_LIMIT;
+    if (alarm_id >= MAX_ALARMS) return E_OS_ID;
 
     AlarmType *a = &alarm_table[alarm_id];
     CounterType *c = alarm_to_counter[alarm_id];
+    if (!c) return E_OS_STATE;
+
+    if (cycle && cycle < c->min_cycle) return E_OS_VALUE;
 
     a->state = ALARMSTATE_ACTIVE;
     a->expiry_tick = start % c->max_allowed_value;
     a->cycle = cycle;
-
     return E_OK;
 }
 
-/**
- * @brief Cancel alarm by ID
- */
 uint8_t CancelAlarm(AlarmTypeId alarm_id) {
-    if (alarm_id >= MAX_ALARMS) return E_OS_LIMIT;
+    if (alarm_id >= MAX_ALARMS) return E_OS_ID;
 
     AlarmType *a = &alarm_table[alarm_id];
     a->state = ALARMSTATE_INACTIVE;
     return E_OK;
 }
+
 
 
 /**
@@ -297,112 +298,174 @@ void SetupAlarm_Demo() {
 /**
  * @brief Start a schedule table at a relative offset
  */
-uint8_t StartScheduleTableRel(uint8_t table_id, TickType offset) {
-    if (table_id >= MAX_SCHEDULETABLES || schedule_table_list[table_id].active)
-        return E_OS_LIMIT;
+uint8_t StartScheduleTableRel(uint8_t id, TickType offset) {
+    if (id >= MAX_SCHEDULETABLES)            return E_OS_ID;
+    ScheduleTableType *t = &schedule_table_list[id];
+    if (t->state != ST_STOPPED)              return E_OS_STATE;
+    if (offset >= t->counter->max_allowed_value) return E_OS_VALUE;
 
-    ScheduleTableType *tbl = &schedule_table_list[table_id];
-    tbl->start_time = (tbl->counter->current_value + offset) % tbl->counter->max_allowed_value;
-    tbl->current_ep = 0;
-    tbl->active = 1;
-
+    TickType cur = t->counter->current_value, max = t->counter->max_allowed_value;
+    t->start_time = (cur + offset) % max;
+    t->current_ep = 0;
+    t->state      = ST_WAITING_START;
     return E_OK;
 }
 
 /**
  * @brief Start a schedule table at an absolute start time
  */
-uint8_t StartScheduleTableAbs(uint8_t table_id, TickType start) {
-    if (table_id >= MAX_SCHEDULETABLES || schedule_table_list[table_id].active)
-        return E_OS_LIMIT;
+uint8_t StartScheduleTableAbs(uint8_t id, TickType start) {
+    if (id >= MAX_SCHEDULETABLES)            return E_OS_ID;
+    ScheduleTableType *t = &schedule_table_list[id];
+    if (t->state != ST_STOPPED)              return E_OS_STATE;
 
-    ScheduleTableType *tbl = &schedule_table_list[table_id];
-    tbl->start_time = start % tbl->counter->max_allowed_value;
-    tbl->current_ep = 0;
-    tbl->active = 1;
-
+    TickType max = t->counter->max_allowed_value;
+    t->start_time = start % max;
+    t->current_ep = 0;
+    t->state      = ST_WAITING_START;
     return E_OK;
 }
 
 /**
  * @brief Stop a running schedule table
  */
-uint8_t StopScheduleTable(uint8_t table_id) {
-    if (table_id >= MAX_SCHEDULETABLES) return E_OS_LIMIT;
+uint8_t StopScheduleTable(uint8_t id) {
+    if (id >= MAX_SCHEDULETABLES)            return E_OS_ID;
+    ScheduleTableType *t = &schedule_table_list[id];
+    if (t->state == ST_STOPPED)              return E_OS_NOFUNC;
 
-    schedule_table_list[table_id].active = 0;
-    schedule_table_list[table_id].current_ep = 0;
-
+    t->state = ST_STOPPED;
+    t->current_ep = 0;
     return E_OK;
 }
 
 /**
  * @brief Synchronize a running schedule table to a new offset
  */
-uint8_t SyncScheduleTable(uint8_t table_id, TickType new_start_offset) {
-    if (table_id >= MAX_SCHEDULETABLES) return E_OS_LIMIT;
+uint8_t SyncScheduleTable(uint8_t id, TickType new_offset) {
+    if (id >= MAX_SCHEDULETABLES)            return E_OS_ID;
+    ScheduleTableType *t = &schedule_table_list[id];
+    if (t->state == ST_STOPPED)              return E_OS_STATE;
 
-    ScheduleTableType *tbl = &schedule_table_list[table_id];
-    tbl->start_time = (tbl->counter->current_value + new_start_offset) % tbl->counter->max_allowed_value;
-    tbl->current_ep = 0;
+    TickType cur = t->counter->current_value, max = t->counter->max_allowed_value;
+    t->start_time = (cur + new_offset) % max;
+    t->current_ep = 0;
+    t->state      = ST_WAITING_START;
     return E_OK;
+}
+
+/**
+ * @brief Calculate difference with wrap-around for tick counters
+ */
+static inline TickType diff_wrap(TickType cur, TickType start, TickType max) {
+    return (cur >= start) ? (cur - start) : (max - start + cur);
 }
 
 /**
  * @brief Tick handler for schedule tables, check and execute expiry points
  */
 void ScheduleTable_Tick(CounterTypeId cid) {
+    CounterType *c = &counter_table[cid];
+
     for (int i = 0; i < MAX_SCHEDULETABLES; i++) {
-        ScheduleTableType *tbl = &schedule_table_list[i];
+        ScheduleTableType *t = &schedule_table_list[i];
+        if (t->counter != c || t->state == ST_STOPPED) continue;
 
-        if (!tbl->active || tbl->counter != &counter_table[cid]) continue;
+        TickType cur = c->current_value;
+        TickType max = c->max_allowed_value;
 
-    TickType rel_time = (tbl->counter->current_value + tbl->counter->max_allowed_value - tbl->start_time) % tbl->counter->max_allowed_value;
+        // Khoảng thời gian đã trôi qua kể từ start_time (đã xử lý wrap)
+        TickType elapsed_from_start = diff_wrap(cur, t->start_time, max);
 
-        while (tbl->current_ep < tbl->num_eps &&
-               tbl->eps[tbl->current_ep].offset <= rel_time) {
+        // 1) Bảng đang chờ start, nhưng có thể đã trễ tick start_time
+        if (t->state == ST_WAITING_START) {
+            if (elapsed_from_start < t->duration) {
+                // Đã tới (hoặc đã vượt qua) mốc start trong phạm vi chu kỳ hiện tại
+                t->state = ST_RUNNING;
+                t->current_ep = 0;
 
-            ExpiryPoint *ep = &tbl->eps[tbl->current_ep];
-
-            switch (ep->action_type) {
-                case SCH_ACTIVATETASK:
-                    ActivateTask(ep->action.task_id);
-                    break;
-                case SCH_SETEVENT:
-                    SetEvent(ep->action.set_event.task_id, ep->action.set_event.event);
-                    break;
-                case SCH_CALLBACK:
-                    ep->action.callback_fn();
-                    break;
+                // Catch-up: chạy mọi EP có offset <= elapsed_from_start (kể cả offset=0)
+                while (t->current_ep < t->num_eps &&
+                       t->eps[t->current_ep].offset <= elapsed_from_start) {
+                    ExpiryPoint *ep = &t->eps[t->current_ep];
+                    if (ep->action_type == SCH_ACTIVATETASK)      ActivateTask(ep->action.task_id);
+                    else if (ep->action_type == SCH_SETEVENT)     SetEvent(ep->action.set_event.task_id, ep->action.set_event.event);
+                    else                                          ep->action.callback_fn();
+                    t->current_ep++;
+                }
+            } else {
+                // Bị lỡ nguyên 1 (hoặc nhiều) chu kỳ mà chưa start
+                if (t->cyclic) {
+                    TickType periods_skipped = elapsed_from_start / t->duration;
+                    t->start_time = (t->start_time + periods_skipped * t->duration) % max;
+                    // vẫn WAITING_START, lần tick sau sẽ vào cửa sổ mới
+                } else {
+                    t->state = ST_STOPPED;
+                    t->current_ep = 0;
+                }
             }
-
-            tbl->current_ep++;
+            continue; // xong bảng này
         }
 
-        if (rel_time >= tbl->duration) {
-            if (tbl->cyclic) {
-                tbl->start_time = tbl->counter->current_value;
-                tbl->current_ep = 0;
-            } else {
-                tbl->active = 0;
+        // 2) RUNNING: xử lý EP và kết thúc chu kỳ nếu tới hạn
+        if (t->state == ST_RUNNING) {
+            // Catch-up mọi EP có offset <= elapsed
+            while (t->current_ep < t->num_eps &&
+                   t->eps[t->current_ep].offset <= elapsed_from_start) {
+                ExpiryPoint *ep = &t->eps[t->current_ep];
+                if (ep->action_type == SCH_ACTIVATETASK)      ActivateTask(ep->action.task_id);
+                else if (ep->action_type == SCH_SETEVENT)     SetEvent(ep->action.set_event.task_id, ep->action.set_event.event);
+                else                                          ep->action.callback_fn();
+                t->current_ep++;
+            }
+
+            // Hết chu kỳ (hoặc vượt quá do trễ) → chuẩn bị chu kỳ mới
+            if (elapsed_from_start >= t->duration) {
+                if (t->cyclic) {
+                    TickType periods = elapsed_from_start / t->duration;
+                    t->start_time = (t->start_time + periods * t->duration) % max;
+                    t->current_ep = 0;
+                    t->state      = ST_WAITING_START;
+
+                    // Trường hợp cùng tick đã bước vào cửa sổ chu kỳ mới → start luôn & catch-up
+                    TickType e2 = diff_wrap(cur, t->start_time, max);
+                    if (e2 < t->duration) {
+                        t->state = ST_RUNNING;
+                        while (t->current_ep < t->num_eps &&
+                               t->eps[t->current_ep].offset <= e2) {
+                            ExpiryPoint *ep = &t->eps[t->current_ep];
+                            if (ep->action_type == SCH_ACTIVATETASK)      ActivateTask(ep->action.task_id);
+                            else if (ep->action_type == SCH_SETEVENT)     SetEvent(ep->action.set_event.task_id, ep->action.set_event.event);
+                            else                                          ep->action.callback_fn();
+                            t->current_ep++;
+                        }
+                    }
+                } else {
+                    t->state = ST_STOPPED;
+                    t->current_ep = 0;
+                }
             }
         }
     }
 }
 
+
+
 /**
  * @brief Setup a demo schedule table with expiry points
  */
 void SetupScheduleTable_Demo(void) {
-    ScheduleTableType *tbl = &schedule_table_list[0];
-
-    tbl->cyclic = 1;
-    tbl->duration = 5000;
-    tbl->num_eps = 3;
-    tbl->counter = &counter_table[0];  // Counter 1ms
-    tbl->eps[0] = (ExpiryPoint){.offset = 200, .action_type = SCH_ACTIVATETASK, .action.task_id = 1};
-    tbl->eps[1] = (ExpiryPoint){.offset = 400, .action_type = SCH_CALLBACK, .action.callback_fn = my_callback1};
-    tbl->eps[2] = (ExpiryPoint){.offset = 800, .action_type = SCH_CALLBACK, .action.callback_fn = my_callback};
-
+    ScheduleTableType *t = &schedule_table_list[0];
+    t->counter  = &counter_table[0];
+    t->duration = 2000;
+    t->cyclic   = 1; 
+    t->num_eps  = 3;
+    t->eps[0]   = (ExpiryPoint){ .offset=200, .action_type=SCH_ACTIVATETASK, .action.task_id=1 };
+    t->eps[1]   = (ExpiryPoint){ .offset=400, .action_type=SCH_CALLBACK,     .action.callback_fn=my_callback1 };
+    t->eps[2]   = (ExpiryPoint){ .offset=800, .action_type=SCH_CALLBACK,     .action.callback_fn=my_callback };
     schedule_table_count++;
+}
+
+void OS_RequestSchedule(void) {
+    SCB_ICSR = ICSR_PENDSVSET;
 }

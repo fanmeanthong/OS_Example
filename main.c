@@ -10,43 +10,6 @@ extern TaskControlBlock TaskTable[TASK_NUM];
 extern TaskType   currentTask ;
 
 // =====================
-// Peripheral Base Address & Register Macros
-// =====================
-#define FLASH_BASE           ((uint32_t)0x40022000)
-#define FLASH_ACR            (*(volatile uint32_t *)(FLASH_BASE + 0x00))
-#define FLASH_ACR_PRFTBE     (1 << 4)
-#define FLASH_ACR_LATENCY_2  (2 << 0)
-#define FLASH_ACR_LATENCY    (0x7 << 0)
-#define RCC_CR               (*(volatile uint32_t *)(RCC_BASE + 0x00))
-#define RCC_CFGR             (*(volatile uint32_t *)(RCC_BASE + 0x04))
-#define RCC_CR_HSEON         (1 << 16)
-#define RCC_CR_HSERDY        (1 << 17)
-#define RCC_CR_PLLON         (1 << 24)
-#define RCC_CR_PLLRDY        (1 << 25)
-#define RCC_CFGR_SW          (0x3 << 0)
-#define RCC_CFGR_SW_PLL      (0x2 << 0)
-#define RCC_CFGR_SWS         (0x3 << 2)
-#define RCC_CFGR_SWS_PLL     (0x2 << 2)
-#define RCC_CFGR_HPRE        (0xF << 4)
-#define RCC_CFGR_PPRE1       (0x7 << 8)
-#define RCC_CFGR_PPRE2       (0x7 << 11)
-#define RCC_CFGR_PPRE1_DIV2  (0x4 << 8)
-#define RCC_CFGR_PLLSRC      (1 << 16)
-#define RCC_CFGR_PLLMULL     (0xF << 18)
-#define RCC_CFGR_PLLMULL9    (0x7 << 18)
-#define GPIO_CRL(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRL_OFFSET))
-#define GPIO_CRH(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_CRH_OFFSET))
-#define GPIO_ODR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_ODR_OFFSET))
-#define GPIO_IDR(GPIO_BASE)  (*(volatile uint32_t *)((GPIO_BASE) + GPIO_IDR_OFFSET))
-#define SYSTICK_LOAD_VAL     (72000 - 1) // 72MHz / 1000 = 1ms
-#define SYSTICK_CTRL_ENABLE  (1 << 0)
-#define SYSTICK_CTRL_TICKINT (1 << 1)
-#define SYSTICK_CTRL_CLKSRC  (1 << 2)
-#define SYST_CSR   (*(volatile uint32_t*)0xE000E010)
-#define SYST_RVR   (*(volatile uint32_t*)0xE000E014)
-#define SYST_CVR   (*(volatile uint32_t*)0xE000E018)
-
-// =====================
 // Event & Task Macros
 // =====================
 #define EVENT_BTN_PRESS      (1U << 0)
@@ -78,20 +41,30 @@ void Task_LEDControl(void);
  * @brief Initialize SysTick timer for 1ms interrupt
  */
 void SysTick_Init(void) {
-    SYST_RVR = SYSTICK_LOAD_VAL;              // Reload value for 1ms
-    SYST_CVR = 0;                             // Clear current value
-    SYST_CSR = SYSTICK_CTRL_ENABLE |
-               SYSTICK_CTRL_TICKINT |
-               SYSTICK_CTRL_CLKSRC;           // Enable SysTick + interrupt + processor clock
+    // PendSV priority = 0xFF, SysTick = 0xFE
+    uint32_t v = SCB_SHPR3;
+    v &= ~0xFFFF0000u;
+    v |= (0xFFu << 16) | (0xFEu << 24);
+    SCB_SHPR3 = v;
+
+    SYST_RVR = SYSTICK_LOAD_VAL;
+    SYST_CVR = 0;
+    SYST_CSR = SYSTICK_CTRL_ENABLE | SYSTICK_CTRL_TICKINT | SYSTICK_CTRL_CLKSRC;
 }
 
 /**
- * @brief SysTick interrupt handler, tick counter
+ * @brief SysTick interrupt handler
  */
+
 void SysTick_Handler(void) {
-    Counter_Tick(0); // Assume Counter 0 is counter_1ms
+    SCB_ICSR = ICSR_PENDSVSET;   
 }
 
+
+void PendSV_Handler(void) {
+    Counter_Tick(0);
+    OS_Schedule();
+}
 // =====================
 // Utility Functions
 // =====================
@@ -197,8 +170,8 @@ void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
  * @brief Blink LED once and terminate task
  */
 void Task_Blink(void) {
-    Led_On();  delay_ms(250);
-    Led_Off(); delay_ms(250);
+    Led_On();  delay_ms(10);
+    Led_Off(); delay_ms(10);
     TerminateTask();  
 }
 
@@ -240,20 +213,20 @@ void Task_LEDControl(void) {
 // Main Function
 // =====================
 /**
- * @brief Main entry: system init, task setup, scheduler loop
+ * @brief Main entry: system initialization, task setup, and scheduler loop
  */
 int main(void) {
-    SystemClock_Config();
-    GPIO_InitAll();
-    SysTick_Init();
-    OS_Init();
+    SystemClock_Config();      // Configure system clock
+    GPIO_InitAll();            // Initialize GPIO for LED and button
+    OS_Init();                 // Initialize OS and task table
     TaskTable[TASK_LED_CTRL_ID] = (TaskControlBlock){TASK_LED_CTRL_ID, Task_LEDControl, SUSPENDED, 1, 0, 2};
     TaskTable[TASK_BLINK_ID]    = (TaskControlBlock){TASK_BLINK_ID,    Task_Blink,      SUSPENDED, 1, 0, 2};
     TaskTable[TASK_BTN_POLL_ID] = (TaskControlBlock){TASK_BTN_POLL_ID, Task_ButtonPoll, SUSPENDED, 1, 0, 2};
     //SetupAlarm_Demo();
-    SetupScheduleTable_Demo();
-    StartScheduleTableRel(0, 50);
+    SetupScheduleTable_Demo(); // Setup demo schedule table
+    StartScheduleTableRel(0, 50); // Start schedule table 0 after 50 ticks
+    SysTick_Init();            // Initialize SysTick timer
     while (1) {
-        OS_Schedule();
+        OS_Schedule();         // Run scheduler loop
     }
 }
