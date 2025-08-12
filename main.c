@@ -2,6 +2,47 @@
 #include "stm32f10x.h"
 #include "kernel.h"
 #include "uart.h"
+#include "setup.h"
+/**
+ * @brief Global variable for current LED mode
+ */
+LedMode g_mode;
+// =====================
+// Schedule Table Callbacks
+// =====================
+// Callbacks for Schedule Table
+void SetMode_Normal(void)  { g_mode = MODE_NORMAL; }
+void SetMode_Warning(void) { g_mode = MODE_WARNING; }
+void SetMode_Off(void)     { g_mode = MODE_OFF; }
+// --- Led control task ---
+void Task_LedTick(void) {
+    static uint16_t accA = 0, accC = 0;
+    const uint16_t period_normal = 500;
+    const uint16_t period_warn   = 100;
+
+    switch (g_mode) {
+    case MODE_NORMAL:
+        accA += 50;
+        if (accA >= period_normal) {
+            LedA_Toggle();
+            accA = 0;
+        }
+        break;
+    case MODE_WARNING:
+        accC += 50;
+        if (accC >= period_warn) {
+            Led_Toggle();
+            accC = 0;
+        }
+        break;
+    default:
+        LedA_Off();
+        Led_Off();
+        accA = accC = 0;
+        break;
+    }
+    TerminateTask();
+}
 
 // =====================
 // External Variables
@@ -16,23 +57,6 @@ extern TaskType   currentTask ;
 #define TASK_LED_CTRL_ID     0
 #define TASK_BLINK_ID        1
 #define TASK_BTN_POLL_ID     2
-
-// =====================
-// Function Prototypes
-// =====================
-void SysTick_Init(void);
-void SysTick_Handler(void);
-void delay_ms(volatile uint32_t ms);
-void SystemClock_Config(void);
-void GPIO_InitAll(void);
-void Led_On(void);
-void Led_Off(void);
-void LedA_On(void);
-void LedA_Off(void);
-void LedA_Toggle(void);
-void Task_Blink(void);
-void Task_ButtonPoll(void);
-void Task_LEDControl(void);
 
 // =====================
 // SysTick Functions
@@ -220,14 +244,13 @@ int main(void) {
     SystemClock_Config();      // Configure system clock
     GPIO_InitAll();            // Initialize GPIO for LED and button
     OS_Init();                 // Initialize OS and task table
-    TaskTable[TASK_LED_CTRL_ID] = (TaskControlBlock){TASK_LED_CTRL_ID, Task_LEDControl, SUSPENDED, 1, 0, 2};
-    TaskTable[TASK_BLINK_ID]    = (TaskControlBlock){TASK_BLINK_ID,    Task_Blink,      SUSPENDED, 1, 0, 2};
-    TaskTable[TASK_BTN_POLL_ID] = (TaskControlBlock){TASK_BTN_POLL_ID, Task_ButtonPoll, SUSPENDED, 1, 0, 2};
-    //SetupAlarm_Demo();
-    SetupScheduleTable_Demo(); // Setup demo schedule table
-    StartScheduleTableRel(0, 50); // Start schedule table 0 after 50 ticks
-    SysTick_Init();            // Initialize SysTick timer
+    TaskTable[TASK_LED_TICK_ID] = (TaskControlBlock){TASK_LED_TICK_ID, Task_LedTick, SUSPENDED, 1, 0, 2};
+    SetupScheduleTable_Mode();
+    StartScheduleTableRel(1, 50);    // start after 50ms to stabilize
+    SetupAlarm_LedTick();
+
+    SysTick_Init();
     while (1) {
-        OS_Schedule();         // Run scheduler loop
+        OS_Schedule();
     }
 }

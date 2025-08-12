@@ -1,5 +1,5 @@
 #include "kernel.h"
-
+#include "setup.h"
 // =====================
 // Global Variables
 // =====================
@@ -463,6 +463,34 @@ void SetupScheduleTable_Demo(void) {
     t->eps[0]   = (ExpiryPoint){ .offset=200, .action_type=SCH_ACTIVATETASK, .action.task_id=1 };
     t->eps[1]   = (ExpiryPoint){ .offset=400, .action_type=SCH_CALLBACK,     .action.callback_fn=my_callback1 };
     t->eps[2]   = (ExpiryPoint){ .offset=800, .action_type=SCH_CALLBACK,     .action.callback_fn=my_callback };
+    schedule_table_count++;
+}
+// Setup alarm_id=2 on counter 0 to activate TASK_LED_TICK_ID every 50ms
+void SetupAlarm_LedTick(void) {
+    AlarmTypeId alarm_id = 2;
+    CounterTypeId counter_id = 0;
+
+    alarm_to_counter[alarm_id] = &counter_table[counter_id];
+    counter_table[counter_id].alarm_list[counter_table[counter_id].num_alarms++] = &alarm_table[alarm_id];
+
+    alarm_table[alarm_id].action_type = ALARMACTION_ACTIVATETASK;
+    alarm_table[alarm_id].action.task_id = TASK_LED_TICK_ID;
+
+    SetRelAlarm(alarm_id, 50, 50); // 50ms offset, 50ms cycle
+}
+
+void SetupScheduleTable_Mode(void) {
+    ScheduleTableType *t = &schedule_table_list[1]; // dùng bảng số 1
+    t->counter  = &counter_table[0]; // counter 1ms
+    t->duration = 5000;              // 4 giây
+    t->cyclic   = 1;
+    t->num_eps  = 3;
+
+    // Dùng callback để đổi mode (đơn giản & rõ ràng)
+    t->eps[0] = (ExpiryPoint){ .offset = 0,    .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Normal  };
+    t->eps[1] = (ExpiryPoint){ .offset = 2000, .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Warning };
+    t->eps[2] = (ExpiryPoint){ .offset = 4000, .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Off     };
+
     schedule_table_count++;
 }
 

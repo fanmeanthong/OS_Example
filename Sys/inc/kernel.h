@@ -169,4 +169,6 @@ void my_callback();
 
 void OS_RequestSchedule(void);
 
+void SetupAlarm_LedTick(void);
+void SetupScheduleTable_Mode(void);
 #endif // __KERNEL_H
