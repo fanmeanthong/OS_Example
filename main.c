@@ -3,6 +3,8 @@
 #include "kernel.h"
 #include "uart.h"
 #include "setup.h"
+#include "os_hooks.h"
+#include <stdio.h>
 /**
  * @brief Global variable for current LED mode
  */
@@ -83,7 +85,6 @@ void SysTick_Init(void) {
 void SysTick_Handler(void) {
     SCB_ICSR = ICSR_PENDSVSET;   
 }
-
 
 void PendSV_Handler(void) {
     Counter_Tick(0);
@@ -190,7 +191,16 @@ void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
 // =====================
 // Task Implementations
 // =====================
+void Task_A(void) {
+    /* Test invalid ActivateTask */
+    ActivateTask_Hook(99); // ID sai -> ErrorHook(E_OS_ID)
+}
 
+void Task_B(void) {
+    /* Tạo stack overflow test */
+    uint8_t big_array[1024]; // giả sử vượt quá margin
+    big_array[0] = 0x55; // dùng để tạo stack load
+}
 /**
  * @brief Blink LED once and terminate task
  */
@@ -241,15 +251,29 @@ void Task_LEDControl(void) {
  * @brief Main entry: system initialization, task setup, and scheduler loop
  */
 int main(void) {
-    SystemClock_Config();      // Configure system clock
-    GPIO_InitAll();            // Initialize GPIO for LED and button
-    OS_Init();                 // Initialize OS and task table
-    TaskTable[TASK_LED_TICK_ID] = (TaskControlBlock){TASK_LED_TICK_ID, Task_LedTick, SUSPENDED, 1, 0, 2};
-    SetupScheduleTable_Mode();
-    StartScheduleTableRel(1, 50);    // start after 50ms to stabilize
-    SetupAlarm_LedTick();
+    SystemClock_Config();
+    GPIO_InitAll();
+    UART1_Init();
 
-    SysTick_Init();
+    print_str("=== AUTOSAR OS Hook Demo Start ===\r\n");
+
+    OS_Init();
+    OS_StackGuard_Set(NULL, 128);
+
+#if OS_USE_STARTUPHOOK
+    StartupHook();
+#endif
+
+    TaskTable[0] = (TaskControlBlock){0, Task_A, SUSPENDED, 1, 0, 2};
+    TaskTable[1] = (TaskControlBlock){1, Task_B, SUSPENDED, 1, 0, 2};
+    
+    OS_RunTaskWithHooks(0); // invalid ActivateTask
+    OS_RunTaskWithHooks(1); // stack overflow
+
+#if OS_USE_SHUTDOWNHOOK
+    ShutdownHook(0);
+#endif
+
     while (1) {
         OS_Schedule();
     }

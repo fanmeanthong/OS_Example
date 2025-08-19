@@ -482,14 +482,14 @@ void SetupAlarm_LedTick(void) {
 void SetupScheduleTable_Mode(void) {
     ScheduleTableType *t = &schedule_table_list[1]; // dùng bảng số 1
     t->counter  = &counter_table[0]; // counter 1ms
-    t->duration = 5000;              // 4 giây
+    t->duration = 5000;              // 5 giây
     t->cyclic   = 1;
     t->num_eps  = 3;
 
     // Dùng callback để đổi mode (đơn giản & rõ ràng)
     t->eps[0] = (ExpiryPoint){ .offset = 0,    .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Normal  };
     t->eps[1] = (ExpiryPoint){ .offset = 2000, .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Warning };
-    t->eps[2] = (ExpiryPoint){ .offset = 4000, .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Off     };
+    t->eps[2] = (ExpiryPoint){ .offset = 3000, .action_type = SCH_CALLBACK, .action.callback_fn = SetMode_Off     };
 
     schedule_table_count++;
 }
