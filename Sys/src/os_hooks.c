@@ -93,6 +93,7 @@ void PreTaskHook(void) {
 #if OS_USE_POSTTASKHOOK
 __attribute__((weak))
 void PostTaskHook(void) {
+    print_str("[Hook] PostTaskHook ");
     if (OS_StackGuard_Check() != E_OK) {
         print_str("[Hook] PostTaskHook detected stack fault\r\n");
     }
