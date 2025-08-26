@@ -16,6 +16,31 @@ LedMode g_mode;
 void SetMode_Normal(void)  { g_mode = MODE_NORMAL; }
 void SetMode_Warning(void) { g_mode = MODE_WARNING; }
 void SetMode_Off(void)     { g_mode = MODE_OFF; }
+
+#define RES_COUNTER   0
+uint32_t sharedCounter = 0;
+void TaskA(void) {
+    GetResource(RES_COUNTER);
+    for (int i=0;i<5;i++) {
+        sharedCounter++;
+        print_str("TaskA tăng counter = ");
+        print_dec(sharedCounter);
+        print_str("\n");
+    }
+    ReleaseResource(RES_COUNTER);
+}
+
+void TaskB(void) {
+    GetResource(RES_COUNTER);
+    for (int i=0;i<5;i++) {
+        sharedCounter++;
+        print_str("TaskB tăng counter = ");
+        print_dec(sharedCounter);
+        print_str("\n");
+    }
+    ReleaseResource(RES_COUNTER);
+}
+
 // --- Led control task ---
 void Task_LedTick(void) {
     static uint16_t accA = 0, accC = 0;

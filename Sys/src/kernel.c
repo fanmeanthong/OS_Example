@@ -294,7 +294,6 @@ void SetupAlarm_Demo() {
 // =====================
 // Schedule Table Functions
 // =====================
-
 /**
  * @brief Start a schedule table at a relative offset
  */
@@ -449,10 +448,11 @@ void ScheduleTable_Tick(CounterTypeId cid) {
     }
 }
 
-
-
+// =====================
+// Schedule Table Setup APIs
+// =====================
 /**
- * @brief Setup a demo schedule table with expiry points
+ * @brief Setup demo schedule table with expiry points
  */
 void SetupScheduleTable_Demo(void) {
     ScheduleTableType *t = &schedule_table_list[0];
@@ -465,7 +465,10 @@ void SetupScheduleTable_Demo(void) {
     t->eps[2]   = (ExpiryPoint){ .offset=800, .action_type=SCH_CALLBACK,     .action.callback_fn=my_callback };
     schedule_table_count++;
 }
-// Setup alarm_id=2 on counter 0 to activate TASK_LED_TICK_ID every 50ms
+
+/**
+ * @brief Setup alarm to activate LED tick task every 50ms
+ */
 void SetupAlarm_LedTick(void) {
     AlarmTypeId alarm_id = 2;
     CounterTypeId counter_id = 0;
@@ -479,6 +482,9 @@ void SetupAlarm_LedTick(void) {
     SetRelAlarm(alarm_id, 50, 50); // 50ms offset, 50ms cycle
 }
 
+/**
+ * @brief Setup schedule table to change LED mode periodically
+ */
 void SetupScheduleTable_Mode(void) {
     ScheduleTableType *t = &schedule_table_list[1]; // dùng bảng số 1
     t->counter  = &counter_table[0]; // counter 1ms
@@ -494,6 +500,53 @@ void SetupScheduleTable_Mode(void) {
     schedule_table_count++;
 }
 
-void OS_RequestSchedule(void) {
-    SCB_ICSR = ICSR_PENDSVSET;
+// =====================
+// Resource Management APIs
+// =====================
+/**
+ * @brief Get a resource (priority ceiling protocol)
+ * @param ResID Resource ID
+ * @return Error code
+ */
+uint8_t GetResource(ResourceType ResID)
+{
+    if (ResID >= MAX_RESOURCES) return E_OS_ID;
+    ResourceControlBlock *r = &ResourceTable[ResID];
+    TaskControlBlock *t = &TaskTable[currentTask];
+
+    if (r->owner != INVALID_TASK) {
+        return E_OS_STATE; // đã có task khác giữ
+    }
+
+    r->owner = currentTask;
+    t->resTaken = ResID;
+
+    // PCP: nâng prio task lên ceiling nếu cần
+    if (t->curPrio < r->ceilingPrio) {
+        t->curPrio = r->ceilingPrio;
+    }
+    return E_OK;
+}
+
+/**
+ * @brief Release a resource (restore priority)
+ * @param ResID Resource ID
+ * @return Error code
+ */
+uint8_t ReleaseResource(ResourceType ResID)
+{
+    if (ResID >= MAX_RESOURCES) return E_OS_ID;
+    ResourceControlBlock *r = &ResourceTable[ResID];
+    TaskControlBlock *t = &TaskTable[currentTask];
+
+    if (r->owner != currentTask) {
+        return E_OS_STATE; // không phải chủ sở hữu
+    }
+
+    r->owner = INVALID_TASK;
+    t->resTaken = INVALID_TASK;
+
+    // phục hồi priority gốc
+    t->curPrio = t->basePrio;
+    return E_OK;
 }

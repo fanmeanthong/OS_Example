@@ -51,24 +51,38 @@ typedef enum {
 #define E_OS_VALUE  3u      // Invalid value
 #define E_OS_NOFUNC 4u      // No action performed
 #define E_OS_LIMIT  5u      // Limit exceeded
-
+#define MAX_RESOURCES  4
+#define INVALID_TASK   0xFF
 // =====================
 // Struct Definitions
 // =====================
+typedef uint8_t ResourceType;
+#define MAX_RESOURCES  4
+#define INVALID_TASK   0xFF
 
+typedef struct {
+    ResourceType id;           // Resource ID
+    uint8_t ceilingPrio;       // Ceiling Priority (PCP)
+    TaskType owner;            // Task đang giữ resource (INVALID_TASK nếu rảnh)
+} ResourceControlBlock;
+
+extern ResourceControlBlock ResourceTable[MAX_RESOURCES];
 /**
  * @brief Task control block: holds all info for a task
  */
 typedef struct {
-    TaskType id;                   // Task ID
-    void (*TaskEntry)(void);       // Pointer to task entry function
-    TaskStateType state;           // Current state of the task
-    uint8_t priority;              // Task priority (0 = highest)
-    uint8_t ActivationCount;       // Number of times the task has been activated
-    uint8_t OsTaskActivation;      // Activation limit for the task
-    EventMaskType SetEventMask;    // Events that have been set (arrived)
-    EventMaskType WaitEventMask;   // Events the task is currently waiting for
+    TaskType id;
+    void (*TaskEntry)(void);
+    TaskStateType state;
+    uint8_t basePrio;      // Priority gốc
+    uint8_t curPrio;       // Priority hiện tại (có thể được boost)
+    uint8_t ActivationCount;
+    uint8_t OsTaskActivation;
+    EventMaskType SetEventMask;
+    EventMaskType WaitEventMask;
+    ResourceType resTaken; // Resource đang giữ (INVALID nếu không giữ)
 } TaskControlBlock;
+
 
 /**
  * @brief Schedule table state
