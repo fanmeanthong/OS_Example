@@ -5,9 +5,9 @@ TARGET = OsExample
 
 # Compiler & flags
 CC      = arm-none-eabi-gcc
-CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib \
-			-ISys/inc
-LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections
+CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding \
+          -ISys/inc
+LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections -lc -lnosys
 
 # Source files list
 SRCS_C := main.c $(wildcard Sys/src/*.c)
@@ -35,11 +35,12 @@ $(TARGET).elf: $(OBJS) stm32f103.ld
 $(TARGET).bin: $(TARGET).elf
 	arm-none-eabi-objcopy -O binary $< $@
 
-# Flash firmware into Blue Pill (file .bin)
+# Flash firmware into Blue Pill
 flash: $(TARGET).bin
-	openocd -f interface/stlink.cfg -f target/stm32f1x.cfg -c "program $(TARGET).bin 0x08000000 verify reset exit"
+	openocd -f interface/stlink.cfg -f target/stm32f1x.cfg \
+		-c "program $(TARGET).bin 0x08000000 verify reset exit"
 
-# Delete unneeded files
+# Clean
 clean:
 	del /Q *.o *.elf *.bin 2>nul
 	del /Q Sys\\src\\*.o 2>nul

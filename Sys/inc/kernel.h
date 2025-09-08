@@ -2,8 +2,11 @@
 #define __KERNEL_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include "uart.h"
-
+#define TASK_SENSOR_ID     0
+#define TASK_CONTROLLER_ID 1
+#define IOC_CH_TEMP        0
 // =====================
 // Type Definitions
 // =====================
@@ -74,13 +77,13 @@ typedef struct {
     TaskType id;
     void (*TaskEntry)(void);
     TaskStateType state;
-    uint8_t basePrio;      // Priority gốc
-    uint8_t curPrio;       // Priority hiện tại (có thể được boost)
+    //uint8_t basePrio;      // Priority gốc
+    //uint8_t curPrio;       // Priority hiện tại (có thể được boost)
     uint8_t ActivationCount;
     uint8_t OsTaskActivation;
     EventMaskType SetEventMask;
     EventMaskType WaitEventMask;
-    ResourceType resTaken; // Resource đang giữ (INVALID nếu không giữ)
+    //ResourceType resTaken; // Resource đang giữ (INVALID nếu không giữ)
 } TaskControlBlock;
 
 
@@ -185,4 +188,29 @@ void OS_RequestSchedule(void);
 
 void SetupAlarm_LedTick(void);
 void SetupScheduleTable_Mode(void);
+
+// =====================
+// IOC (Inter-OS-Application Communication)
+// =====================
+#define MAX_IOC_CHANNELS   8
+#define IOC_BUFFER_SIZE    4   // số mẫu dữ liệu giữ lại (nếu queue)
+
+typedef struct {
+    uint8_t   used;                 // channel đã dùng?
+    uint8_t   data_size;            // kích thước dữ liệu (bytes)
+    uint8_t   num_receivers;        // số task nhận
+    TaskType  receivers[4];         // danh sách task nhận (tối đa 4)
+    uint8_t   flag_new;             // cờ dữ liệu mới (cho 1-1 / 1-N)
+    uint8_t   head, tail, count;    // cho queue
+    uint8_t   buffer[IOC_BUFFER_SIZE][8]; // dữ liệu (tối đa 8 byte/signal)
+} IocChannelType;
+
+extern IocChannelType IocChannelTable[MAX_IOC_CHANNELS];
+
+// API prototypes
+uint8_t IocSend(uint8_t ch, void *data);
+uint8_t IocReceive(uint8_t ch, void *data);
+uint8_t IocReceiveGroup(uint8_t ch, void *data, uint8_t num);
+uint8_t IocHasNewData(uint8_t ch);
+
 #endif // __KERNEL_H

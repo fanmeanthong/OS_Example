@@ -1,5 +1,6 @@
 #include "kernel.h"
 #include "setup.h"
+#include <string.h>
 // =====================
 // Global Variables
 // =====================
@@ -71,7 +72,7 @@ uint8_t ActivateTask(TaskType id) {
     if (t->state == SUSPENDED) {
         t->state = READY;
     }
-    OS_RequestSchedule(); 
+    //OS_RequestSchedule(); 
     return E_OK;
 }
 
@@ -507,7 +508,7 @@ void SetupScheduleTable_Mode(void) {
  * @brief Get a resource (priority ceiling protocol)
  * @param ResID Resource ID
  * @return Error code
- */
+ *
 uint8_t GetResource(ResourceType ResID)
 {
     if (ResID >= MAX_RESOURCES) return E_OS_ID;
@@ -526,13 +527,13 @@ uint8_t GetResource(ResourceType ResID)
         t->curPrio = r->ceilingPrio;
     }
     return E_OK;
-}
+}*/
 
 /**
  * @brief Release a resource (restore priority)
  * @param ResID Resource ID
  * @return Error code
- */
+ *
 uint8_t ReleaseResource(ResourceType ResID)
 {
     if (ResID >= MAX_RESOURCES) return E_OS_ID;
@@ -549,4 +550,78 @@ uint8_t ReleaseResource(ResourceType ResID)
     // phục hồi priority gốc
     t->curPrio = t->basePrio;
     return E_OK;
+}*/
+
+IocChannelType IocChannelTable[MAX_IOC_CHANNELS];
+
+// =====================
+// IOC APIs
+// =====================
+uint8_t IocSend(uint8_t ch, void *data) {
+    if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return E_OS_ID;
+    IocChannelType *c = &IocChannelTable[ch];
+
+    // Copy data vào buffer (overwrite nếu full)
+    memcpy(c->buffer[c->head], data, c->data_size);
+    c->head = (c->head + 1) % IOC_BUFFER_SIZE;
+    if (c->count < IOC_BUFFER_SIZE) c->count++;
+    else c->tail = (c->tail + 1) % IOC_BUFFER_SIZE;
+
+    c->flag_new = 1;
+
+    // Có thể thêm: SetEvent cho receivers
+    for (int i=0;i<c->num_receivers;i++) {
+        SetEvent(c->receivers[i], (1U<<ch)); // mỗi channel map vào 1 event mask
+    }
+    return E_OK;
+}
+
+uint8_t IocReceive(uint8_t ch, void *data) {
+    if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return E_OS_ID;
+    IocChannelType *c = &IocChannelTable[ch];
+
+    if (c->count == 0) return E_OS_NOFUNC; // không có dữ liệu
+
+    memcpy(data, c->buffer[c->tail], c->data_size);
+    c->tail = (c->tail + 1) % IOC_BUFFER_SIZE;
+    c->count--;
+    c->flag_new = 0;
+
+    return E_OK;
+}
+
+uint8_t IocReceiveGroup(uint8_t ch, void *data, uint8_t num) {
+    if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return E_OS_ID;
+    IocChannelType *c = &IocChannelTable[ch];
+    if (c->count < num) return E_OS_NOFUNC; // chưa đủ dữ liệu
+
+    for (int i=0; i<num; i++) {
+        memcpy((uint8_t*)data + i*c->data_size, c->buffer[c->tail], c->data_size);
+        c->tail = (c->tail + 1) % IOC_BUFFER_SIZE;
+        c->count--;
+    }
+    if (c->count == 0) c->flag_new = 0;
+    return E_OK;
+}
+
+uint8_t IocHasNewData(uint8_t ch) {
+    if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return 0;
+    return IocChannelTable[ch].flag_new;
+}
+
+void Ioc_InitChannel(uint8_t ch, uint8_t data_size, TaskType *receivers, uint8_t num) {
+    IocChannelTable[ch].used = 1;
+    IocChannelTable[ch].data_size = data_size;
+    IocChannelTable[ch].num_receivers = num;
+    for (int i=0;i<num;i++) {
+        IocChannelTable[ch].receivers[i] = receivers[i];
+    }
+    IocChannelTable[ch].head = 0;
+    IocChannelTable[ch].tail = 0;
+    IocChannelTable[ch].count = 0;
+    IocChannelTable[ch].flag_new = 0;
+}
+
+void OS_RequestSchedule(void) {
+    SCB_ICSR = ICSR_PENDSVSET;
 }

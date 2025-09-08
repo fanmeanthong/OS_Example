@@ -17,29 +17,6 @@ void SetMode_Normal(void)  { g_mode = MODE_NORMAL; }
 void SetMode_Warning(void) { g_mode = MODE_WARNING; }
 void SetMode_Off(void)     { g_mode = MODE_OFF; }
 
-#define RES_COUNTER   0
-uint32_t sharedCounter = 0;
-void TaskA(void) {
-    GetResource(RES_COUNTER);
-    for (int i=0;i<5;i++) {
-        sharedCounter++;
-        print_str("TaskA tăng counter = ");
-        print_dec(sharedCounter);
-        print_str("\n");
-    }
-    ReleaseResource(RES_COUNTER);
-}
-
-void TaskB(void) {
-    GetResource(RES_COUNTER);
-    for (int i=0;i<5;i++) {
-        sharedCounter++;
-        print_str("TaskB tăng counter = ");
-        print_dec(sharedCounter);
-        print_str("\n");
-    }
-    ReleaseResource(RES_COUNTER);
-}
 
 // --- Led control task ---
 void Task_LedTick(void) {
@@ -80,11 +57,12 @@ extern TaskType   currentTask ;
 // =====================
 // Event & Task Macros
 // =====================
+/*
 #define EVENT_BTN_PRESS      (1U << 0)
 #define TASK_LED_CTRL_ID     0
 #define TASK_BLINK_ID        1
 #define TASK_BTN_POLL_ID     2
-
+*/
 // =====================
 // SysTick Functions
 // =====================
@@ -213,19 +191,6 @@ void LedA_Off(void) { GPIO_ODR(GPIOA_BASE) &= ~(1 << 0); }
  */
 void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
 
-// =====================
-// Task Implementations
-// =====================
-void Task_A(void) {
-    /* Test invalid ActivateTask */
-    ActivateTask_Hook(99); // ID sai -> ErrorHook(E_OS_ID)
-}
-
-void Task_B(void) {
-    /* Tạo stack overflow test */
-    uint8_t big_array[1024]; // giả sử vượt quá margin
-    big_array[0] = 0x55; // dùng để tạo stack load
-}
 /**
  * @brief Blink LED once and terminate task
  */
@@ -237,7 +202,7 @@ void Task_Blink(void) {
 
 /**
  * @brief Poll button state and set event if pressed
- */
+
 void Task_ButtonPoll(void) {
     static uint8_t last_state = 1;
     uint8_t now = (GPIO_IDR(GPIOA_BASE) & (1 << 1)) ? 1 : 0;
@@ -250,10 +215,10 @@ void Task_ButtonPoll(void) {
     last_state = now;
     ChainTask(TASK_BTN_POLL_ID);  // 
 }
-
+ */
 /**
  * @brief Control LED when button event occurs
- */
+
 void Task_LEDControl(void) {
     EventMaskType ev;
     WaitEvent(EVENT_BTN_PRESS);
@@ -268,6 +233,35 @@ void Task_LEDControl(void) {
     ActivateTask(TASK_LED_CTRL_ID);
     TerminateTask();
 }
+ */
+void Task_Sensor(void) {
+    int temperature = 25 + (rand() % 5); // mô phỏng giá trị đọc sensor
+    IocSend(IOC_CH_TEMP, &temperature);
+
+    print_str("[Sensor] send temp = ");
+    print_dec(temperature);
+    print_str("\r\n");
+
+    ChainTask(TASK_SENSOR_ID);
+}
+void Task_Controller(void) {
+    int temp = 0;
+    if (IocHasNewData(IOC_CH_TEMP)) {
+        IocReceive(IOC_CH_TEMP, &temp);
+
+        print_str("[Controller] receive temp = ");
+        print_dec(temp);
+        print_str("\r\n");
+
+        if (temp > 27) {
+            print_str("Fan ON\r\n");
+        } else {
+            print_str("Fan OFF\r\n");
+        }
+    }
+    ChainTask(TASK_CONTROLLER_ID);
+}
+
 
 // =====================
 // Main Function
@@ -280,24 +274,25 @@ int main(void) {
     GPIO_InitAll();
     UART1_Init();
 
-    print_str("=== AUTOSAR OS Hook Demo Start ===\r\n");
+    print_str("=== IOC 1-1 Demo Start ===\r\n");
 
     OS_Init();
-    OS_StackGuard_Set(NULL, 128);
 
-#if OS_USE_STARTUPHOOK
-    StartupHook();
-#endif
+    // --- Init IOC channel cho Task_Sensor → Task_Controller ---
+    TaskType recv_list[1] = { TASK_CONTROLLER_ID };
+    Ioc_InitChannel(IOC_CH_TEMP, sizeof(int), recv_list, 1);
 
-    TaskTable[0] = (TaskControlBlock){0, Task_A, SUSPENDED, 1, 0, 2};
-    TaskTable[1] = (TaskControlBlock){1, Task_B, SUSPENDED, 1, 0, 2};
-    
-    OS_RunTaskWithHooks(0); // invalid ActivateTask
-    OS_RunTaskWithHooks(1); // stack overflow
+    // --- Tạo bảng task ---
+    TaskTable[TASK_SENSOR_ID] = (TaskControlBlock){ 
+        TASK_SENSOR_ID, Task_Sensor, SUSPENDED, 0, 2 
+    };
+    TaskTable[TASK_CONTROLLER_ID] = (TaskControlBlock){ 
+        TASK_CONTROLLER_ID, Task_Controller, SUSPENDED, 0, 2
+    };
 
-#if OS_USE_SHUTDOWNHOOK
-    ShutdownHook(0);
-#endif
+    // Kích hoạt task sensor và controller lần đầu
+    ActivateTask(TASK_SENSOR_ID);
+    ActivateTask(TASK_CONTROLLER_ID);
 
     while (1) {
         OS_Schedule();
