@@ -168,29 +168,45 @@ void GPIO_InitAll(void) {
 // LED Control Functions
 // =====================
 /**
- * @brief Turn on LED at PC13
+ * @brief Toggle LED at PC13
  */
 void Led_Toggle(void) {
-    GPIO_ODR(GPIOC_BASE) ^= (1 << 13); // Toggle PC13
+    GPIO_ODR(GPIOC_BASE) ^= (1 << 13);
 }
-void Led_On (void) {  GPIO_ODR(GPIOC_BASE)  = !(1 << 13); }
+/**
+ * @brief Turn on LED at PC13
+ */
+void Led_On(void) {
+    GPIO_ODR(GPIOC_BASE) = !(1 << 13);
+}
 /**
  * @brief Turn off LED at PC13
  */
-void Led_Off(void) {  GPIO_ODR(GPIOC_BASE) = (1 << 13); }
+void Led_Off(void) {
+    GPIO_ODR(GPIOC_BASE) = (1 << 13);
+}
 /**
  * @brief Turn on LED at PA0
  */
-void LedA_On(void) { GPIO_ODR(GPIOA_BASE) |= (1 << 0); }
+void LedA_On(void) {
+    GPIO_ODR(GPIOA_BASE) |= (1 << 0);
+}
 /**
  * @brief Turn off LED at PA0
  */
-void LedA_Off(void) { GPIO_ODR(GPIOA_BASE) &= ~(1 << 0); }
+void LedA_Off(void) {
+    GPIO_ODR(GPIOA_BASE) &= ~(1 << 0);
+}
 /**
  * @brief Toggle LED at PA0
  */
-void LedA_Toggle(void) { GPIO_ODR(GPIOA_BASE) ^= (1 << 0); }
+void LedA_Toggle(void) {
+    GPIO_ODR(GPIOA_BASE) ^= (1 << 0);
+}
 
+// =====================
+// Task Implementations
+// =====================
 /**
  * @brief Blink LED once and terminate task
  */
@@ -201,41 +217,10 @@ void Task_Blink(void) {
 }
 
 /**
- * @brief Poll button state and set event if pressed
-
-void Task_ButtonPoll(void) {
-    static uint8_t last_state = 1;
-    uint8_t now = (GPIO_IDR(GPIOA_BASE) & (1 << 1)) ? 1 : 0;
-    if (last_state == 1 && now == 0) {
-        delay_ms(20);  // debounce
-        if ((GPIO_IDR(GPIOA_BASE) & (1 << 1)) == 0) {
-            SetEvent(TASK_LED_CTRL_ID, EVENT_BTN_PRESS);
-        }
-    }
-    last_state = now;
-    ChainTask(TASK_BTN_POLL_ID);  // 
-}
- */
-/**
- * @brief Control LED when button event occurs
-
-void Task_LEDControl(void) {
-    EventMaskType ev;
-    WaitEvent(EVENT_BTN_PRESS);
-    GetEvent(currentTask, &ev);
-    if (ev & EVENT_BTN_PRESS) {
-        Led_On();  
-        delay_ms(500);
-        Led_Off();
-        delay_ms(500);
-        ClearEvent(EVENT_BTN_PRESS);
-    }
-    ActivateTask(TASK_LED_CTRL_ID);
-    TerminateTask();
-}
+ * @brief Simulate sensor task: send temperature to controller
  */
 void Task_Sensor(void) {
-    int temperature = 25 + (rand() % 5); // mô phỏng giá trị đọc sensor
+    int temperature = 25 + (rand() % 5); // Simulate sensor value
     IocSend(IOC_CH_TEMP, &temperature);
 
     print_str("[Sensor] send temp = ");
@@ -244,6 +229,10 @@ void Task_Sensor(void) {
 
     ChainTask(TASK_SENSOR_ID);
 }
+
+/**
+ * @brief Controller task: receive temperature and control fan
+ */
 void Task_Controller(void) {
     int temp = 0;
     if (IocHasNewData(IOC_CH_TEMP)) {
@@ -262,27 +251,26 @@ void Task_Controller(void) {
     ChainTask(TASK_CONTROLLER_ID);
 }
 
-
 // =====================
 // Main Function
 // =====================
 /**
- * @brief Main entry: system initialization, task setup, and scheduler loop
+ * @brief Main entry: system initialization, IOC setup, task setup, scheduler loop
  */
 int main(void) {
-    SystemClock_Config();
-    GPIO_InitAll();
-    UART1_Init();
+    SystemClock_Config();      // Configure system clock
+    GPIO_InitAll();            // Initialize GPIO
+    UART1_Init();              // Initialize UART
 
     print_str("=== IOC 1-1 Demo Start ===\r\n");
 
-    OS_Init();
+    OS_Init();                 // Initialize OS
 
-    // --- Init IOC channel cho Task_Sensor → Task_Controller ---
+    // Init IOC channel for Sensor → Controller
     TaskType recv_list[1] = { TASK_CONTROLLER_ID };
     Ioc_InitChannel(IOC_CH_TEMP, sizeof(int), recv_list, 1);
 
-    // --- Tạo bảng task ---
+    // Create task table
     TaskTable[TASK_SENSOR_ID] = (TaskControlBlock){ 
         TASK_SENSOR_ID, Task_Sensor, SUSPENDED, 0, 2 
     };
@@ -290,7 +278,7 @@ int main(void) {
         TASK_CONTROLLER_ID, Task_Controller, SUSPENDED, 0, 2
     };
 
-    // Kích hoạt task sensor và controller lần đầu
+    // Activate tasks
     ActivateTask(TASK_SENSOR_ID);
     ActivateTask(TASK_CONTROLLER_ID);
 

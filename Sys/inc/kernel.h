@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "uart.h"
+// Define task IDs: sensor and controller
 #define TASK_SENSOR_ID     0
 #define TASK_CONTROLLER_ID 1
 #define IOC_CH_TEMP        0
@@ -193,16 +194,16 @@ void SetupScheduleTable_Mode(void);
 // IOC (Inter-OS-Application Communication)
 // =====================
 #define MAX_IOC_CHANNELS   8
-#define IOC_BUFFER_SIZE    4   // số mẫu dữ liệu giữ lại (nếu queue)
+#define IOC_BUFFER_SIZE    4   // Max buffered samples per channel
 
 typedef struct {
-    uint8_t   used;                 // channel đã dùng?
-    uint8_t   data_size;            // kích thước dữ liệu (bytes)
-    uint8_t   num_receivers;        // số task nhận
-    TaskType  receivers[4];         // danh sách task nhận (tối đa 4)
-    uint8_t   flag_new;             // cờ dữ liệu mới (cho 1-1 / 1-N)
-    uint8_t   head, tail, count;    // cho queue
-    uint8_t   buffer[IOC_BUFFER_SIZE][8]; // dữ liệu (tối đa 8 byte/signal)
+    uint8_t   used;                 // Channel in use
+    uint8_t   data_size;            // Data size (bytes)
+    uint8_t   num_receivers;        // Number of receiver tasks
+    TaskType  receivers[4];         // Receiver task list (max 4)
+    uint8_t   flag_new;             // New data flag (for 1-1/1-N)
+    uint8_t   head, tail, count;    // Queue pointers/counter
+    uint8_t   buffer[IOC_BUFFER_SIZE][8]; // Data buffer (max 8 bytes/sample)
 } IocChannelType;
 
 extern IocChannelType IocChannelTable[MAX_IOC_CHANNELS];
