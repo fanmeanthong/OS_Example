@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "uart.h"
+/*
+ * Task and Channel ID definitions for kernel modules.
+ * - TASK_*_ID: Identifiers for different system tasks.
+ * - IOC_CH_*: Identifiers for inter-task communication channels.
+ */
 #define TASK_SENSOR_ID     0
 #define TASK_CONTROLLER_ID 1
 #define TASK_CLUSTER_ID    2
@@ -205,19 +210,20 @@ void SetupScheduleTable_Mode(void);
 // =====================
 // IOC (Inter-OS-Application Communication)
 // =====================
+// IOC channel definitions and API for inter-task data exchange
 #define MAX_IOC_CHANNELS   8
-#define IOC_BUFFER_SIZE    4   // số mẫu dữ liệu giữ lại (nếu queue)
+#define IOC_BUFFER_SIZE    4   
 
 typedef struct {
-    uint8_t   used;                 // Channel đã khởi tạo?
-    uint8_t   data_size;            // Kích thước dữ liệu (bytes)
-    uint8_t   num_receivers;        // Số task nhận
-    TaskType  receivers[4];         // Danh sách task nhận
-    uint8_t   head;                 // Vị trí ghi mới (producer)
-    uint8_t   count;                // Số phần tử hiện có trong buffer
-    uint8_t   buffer[IOC_BUFFER_SIZE][8];   // Circular buffer dữ liệu
-    uint8_t   tail[4];              // Mỗi receiver có tail riêng
-    uint8_t   has_new[4];           // Flag dữ liệu mới cho từng receiver
+    uint8_t   used;                 // Channel initialized?
+    uint8_t   data_size;            // Data size (bytes)
+    uint8_t   num_receivers;        // Number of receiver tasks
+    TaskType  receivers[4];         // List of receiver tasks
+    uint8_t   head;                 // Write position (producer)
+    uint8_t   count;                // Number of elements currently in buffer
+    uint8_t   buffer[IOC_BUFFER_SIZE][8];   // Circular data buffer
+    uint8_t   tail[4];              // Each receiver has its own tail
+    uint8_t   has_new[4];           // New data flag for each receiver
 } IocChannelType;
 
 

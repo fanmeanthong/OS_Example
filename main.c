@@ -234,15 +234,21 @@ void Task_LEDControl(void) {
     TerminateTask();
 }
  */
+/**
+ * @brief Task: Simulate speed sensor, send speed via IOC, and reschedule itself.
+ */
 void Task_SpeedSensor(void) {
     int speed = 60 + (rand() % 20);
     print_str("[Sensor] Send speed=");
-    print_dec(speed);   
+    print_dec(speed);
     print_str(" km/h\r\n");
     IocSend(IOC_CH_SPEED, &speed);
     ChainTask(TASK_SENSOR_ID);
 }
 
+/**
+ * @brief Task: Receive speed from IOC and display for cluster, then reschedule.
+ */
 void Task_Cluster(void) {
     int speed;
     if (IocHasNewData(IOC_CH_SPEED, TASK_CLUSTER_ID)) {
@@ -254,6 +260,9 @@ void Task_Cluster(void) {
     ChainTask(TASK_CLUSTER_ID);
 }
 
+/**
+ * @brief Task: Receive speed from IOC and display for ABS, then reschedule.
+ */
 void Task_ABS(void) {
     int speed;
     if (IocHasNewData(IOC_CH_SPEED, TASK_ABS_ID)) {
@@ -272,30 +281,32 @@ void Task_ABS(void) {
  * @brief Main entry: system initialization, task setup, and scheduler loop
  */
 int main(void) {
+    // --- System & Peripheral Init ---
     SystemClock_Config();
     GPIO_InitAll();
     UART1_Init();
 
     print_str("=== IOC 1-1 Demo Start ===\r\n");
 
+    // --- OS Init ---
     OS_Init();
 
+    // --- IOC Channel Init ---
     TaskType recv_list_speed[2] = { TASK_CLUSTER_ID, TASK_ABS_ID };
     Ioc_InitChannel(IOC_CH_SPEED, sizeof(int), recv_list_speed, 2);
 
+    // --- Task Table Setup ---
+    TaskTable[TASK_SENSOR_ID] = (TaskControlBlock){
+        TASK_SENSOR_ID, Task_SpeedSensor, SUSPENDED, 0, 2
+    };
+    TaskTable[TASK_CLUSTER_ID] = (TaskControlBlock){
+        TASK_CLUSTER_ID, Task_Cluster, SUSPENDED, 0, 2
+    };
+    TaskTable[TASK_ABS_ID] = (TaskControlBlock){
+        TASK_ABS_ID, Task_ABS, SUSPENDED, 0, 2
+    };
 
-
-    // --- Tạo bảng task ---
-    TaskTable[TASK_SENSOR_ID] = (TaskControlBlock){ 
-        TASK_SENSOR_ID, Task_SpeedSensor, SUSPENDED, 0, 2};
-
-    TaskTable[TASK_CLUSTER_ID] = (TaskControlBlock){ 
-        TASK_CLUSTER_ID, Task_Cluster, SUSPENDED, 0, 2};
-
-    TaskTable[TASK_ABS_ID] = (TaskControlBlock){ 
-        TASK_ABS_ID, Task_ABS, SUSPENDED, 0 ,2};
-
-    // 
+    // --- Activate Initial Tasks ---
     ActivateTask(TASK_SENSOR_ID);
     ActivateTask(TASK_CLUSTER_ID);
     ActivateTask(TASK_ABS_ID);
