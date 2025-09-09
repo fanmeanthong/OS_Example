@@ -6,7 +6,20 @@
 #include "uart.h"
 #define TASK_SENSOR_ID     0
 #define TASK_CONTROLLER_ID 1
-#define IOC_CH_TEMP        0
+#define TASK_CLUSTER_ID    2
+#define TASK_ABS_ID        3
+#define TASK_PEDAL_ID      4
+#define TASK_BRAKE_ID      5
+#define TASK_GEAR_ID       6
+#define TASK_SAFETY_ID     7
+
+// Channel ID
+#define IOC_CH_TEMP   0
+#define IOC_CH_SPEED  1
+#define IOC_CH_PEDAL  2
+#define IOC_CH_BRAKE  3
+#define IOC_CH_GEAR   4
+
 // =====================
 // Type Definitions
 // =====================
@@ -40,7 +53,7 @@ typedef enum {
 // =====================
 // System Limits
 // =====================
-#define TASK_NUM 3        // Number of tasks in the system
+#define TASK_NUM 5        // Number of tasks in the system
 #define MAX_ALARMS 10     // Maximum number of alarms per counter
 #define MAX_SCHEDULETABLES 4   // Maximum number of schedule tables
 #define MAX_EXPIRY_POINTS  8   // Maximum num ber of expiry points per schedule table
@@ -196,21 +209,24 @@ void SetupScheduleTable_Mode(void);
 #define IOC_BUFFER_SIZE    4   // số mẫu dữ liệu giữ lại (nếu queue)
 
 typedef struct {
-    uint8_t   used;                 // channel đã dùng?
-    uint8_t   data_size;            // kích thước dữ liệu (bytes)
-    uint8_t   num_receivers;        // số task nhận
-    TaskType  receivers[4];         // danh sách task nhận (tối đa 4)
-    uint8_t   flag_new;             // cờ dữ liệu mới (cho 1-1 / 1-N)
-    uint8_t   head, tail, count;    // cho queue
-    uint8_t   buffer[IOC_BUFFER_SIZE][8]; // dữ liệu (tối đa 8 byte/signal)
+    uint8_t   used;                 // Channel đã khởi tạo?
+    uint8_t   data_size;            // Kích thước dữ liệu (bytes)
+    uint8_t   num_receivers;        // Số task nhận
+    TaskType  receivers[4];         // Danh sách task nhận
+    uint8_t   head;                 // Vị trí ghi mới (producer)
+    uint8_t   count;                // Số phần tử hiện có trong buffer
+    uint8_t   buffer[IOC_BUFFER_SIZE][8];   // Circular buffer dữ liệu
+    uint8_t   tail[4];              // Mỗi receiver có tail riêng
+    uint8_t   has_new[4];           // Flag dữ liệu mới cho từng receiver
 } IocChannelType;
+
 
 extern IocChannelType IocChannelTable[MAX_IOC_CHANNELS];
 
 // API prototypes
 uint8_t IocSend(uint8_t ch, void *data);
-uint8_t IocReceive(uint8_t ch, void *data);
+uint8_t IocReceive(uint8_t ch, void *data, TaskType receiver);
 uint8_t IocReceiveGroup(uint8_t ch, void *data, uint8_t num);
-uint8_t IocHasNewData(uint8_t ch);
+uint8_t IocHasNewData(uint8_t ch, TaskType receiver);
 
 #endif // __KERNEL_H

@@ -234,34 +234,36 @@ void Task_LEDControl(void) {
     TerminateTask();
 }
  */
-void Task_Sensor(void) {
-    int temperature = 25 + (rand() % 5); // mô phỏng giá trị đọc sensor
-    IocSend(IOC_CH_TEMP, &temperature);
-
-    print_str("[Sensor] send temp = ");
-    print_dec(temperature);
-    print_str("\r\n");
-
+void Task_SpeedSensor(void) {
+    int speed = 60 + (rand() % 20);
+    print_str("[Sensor] Send speed=");
+    print_dec(speed);   
+    print_str(" km/h\r\n");
+    IocSend(IOC_CH_SPEED, &speed);
     ChainTask(TASK_SENSOR_ID);
 }
-void Task_Controller(void) {
-    int temp = 0;
-    if (IocHasNewData(IOC_CH_TEMP)) {
-        IocReceive(IOC_CH_TEMP, &temp);
 
-        print_str("[Controller] receive temp = ");
-        print_dec(temp);
-        print_str("\r\n");
-
-        if (temp > 27) {
-            print_str("Fan ON\r\n");
-        } else {
-            print_str("Fan OFF\r\n");
-        }
+void Task_Cluster(void) {
+    int speed;
+    if (IocHasNewData(IOC_CH_SPEED, TASK_CLUSTER_ID)) {
+        IocReceive(IOC_CH_SPEED, &speed, TASK_CLUSTER_ID);
+        print_str("[Cluster] speed=");
+        print_dec(speed);
+        print_str(" km/h\r\n");
     }
-    ChainTask(TASK_CONTROLLER_ID);
+    ChainTask(TASK_CLUSTER_ID);
 }
 
+void Task_ABS(void) {
+    int speed;
+    if (IocHasNewData(IOC_CH_SPEED, TASK_ABS_ID)) {
+        IocReceive(IOC_CH_SPEED, &speed, TASK_ABS_ID);
+        print_str("[ABS] speed=");
+        print_dec(speed);
+        print_str(" km/h\r\n");
+    }
+    ChainTask(TASK_ABS_ID);
+}
 
 // =====================
 // Main Function
@@ -278,21 +280,25 @@ int main(void) {
 
     OS_Init();
 
-    // --- Init IOC channel cho Task_Sensor → Task_Controller ---
-    TaskType recv_list[1] = { TASK_CONTROLLER_ID };
-    Ioc_InitChannel(IOC_CH_TEMP, sizeof(int), recv_list, 1);
+    TaskType recv_list_speed[2] = { TASK_CLUSTER_ID, TASK_ABS_ID };
+    Ioc_InitChannel(IOC_CH_SPEED, sizeof(int), recv_list_speed, 2);
+
+
 
     // --- Tạo bảng task ---
     TaskTable[TASK_SENSOR_ID] = (TaskControlBlock){ 
-        TASK_SENSOR_ID, Task_Sensor, SUSPENDED, 0, 2 
-    };
-    TaskTable[TASK_CONTROLLER_ID] = (TaskControlBlock){ 
-        TASK_CONTROLLER_ID, Task_Controller, SUSPENDED, 0, 2
-    };
+        TASK_SENSOR_ID, Task_SpeedSensor, SUSPENDED, 0, 2};
 
-    // Kích hoạt task sensor và controller lần đầu
+    TaskTable[TASK_CLUSTER_ID] = (TaskControlBlock){ 
+        TASK_CLUSTER_ID, Task_Cluster, SUSPENDED, 0, 2};
+
+    TaskTable[TASK_ABS_ID] = (TaskControlBlock){ 
+        TASK_ABS_ID, Task_ABS, SUSPENDED, 0 ,2};
+
+    // 
     ActivateTask(TASK_SENSOR_ID);
-    ActivateTask(TASK_CONTROLLER_ID);
+    ActivateTask(TASK_CLUSTER_ID);
+    ActivateTask(TASK_ABS_ID);
 
     while (1) {
         OS_Schedule();

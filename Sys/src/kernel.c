@@ -561,35 +561,51 @@ uint8_t IocSend(uint8_t ch, void *data) {
     if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return E_OS_ID;
     IocChannelType *c = &IocChannelTable[ch];
 
-    // Copy data vào buffer (overwrite nếu full)
+    // Copy vào buffer
     memcpy(c->buffer[c->head], data, c->data_size);
     c->head = (c->head + 1) % IOC_BUFFER_SIZE;
     if (c->count < IOC_BUFFER_SIZE) c->count++;
-    else c->tail = (c->tail + 1) % IOC_BUFFER_SIZE;
+    else {
+        // Nếu full: dịch tất cả tail lên
+        for (int i=0; i<c->num_receivers; i++) {
+            c->tail[i] = (c->tail[i] + 1) % IOC_BUFFER_SIZE;
+        }
+    }
 
-    c->flag_new = 1;
-
-    // Có thể thêm: SetEvent cho receivers
-    for (int i=0;i<c->num_receivers;i++) {
-        SetEvent(c->receivers[i], (1U<<ch)); // mỗi channel map vào 1 event mask
+    // Đánh dấu tất cả receivers có dữ liệu mới
+    for (int i=0; i<c->num_receivers; i++) {
+        c->has_new[i] = 1;
     }
     return E_OK;
 }
 
-uint8_t IocReceive(uint8_t ch, void *data) {
+
+uint8_t IocReceive(uint8_t ch, void *data, TaskType receiver) {
     if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return E_OS_ID;
     IocChannelType *c = &IocChannelTable[ch];
 
-    if (c->count == 0) return E_OS_NOFUNC; // không có dữ liệu
+    // Xác định index receiver
+    int ridx = -1;
+    for (int i=0; i<c->num_receivers; i++) {
+        if (c->receivers[i] == receiver) {
+            ridx = i; break;
+        }
+    }
+    if (ridx < 0) return E_OS_ID;
 
-    memcpy(data, c->buffer[c->tail], c->data_size);
-    c->tail = (c->tail + 1) % IOC_BUFFER_SIZE;
-    c->count--;
-    c->flag_new = 0;
+    if (!c->has_new[ridx]) return E_OS_NOFUNC; // Không có dữ liệu mới cho receiver này
 
+    memcpy(data, c->buffer[c->tail[ridx]], c->data_size);
+    c->tail[ridx] = (c->tail[ridx] + 1) % IOC_BUFFER_SIZE;
+
+    // Nếu receiver đã đọc hết → clear flag
+    if (c->tail[ridx] == c->head) {
+        c->has_new[ridx] = 0;
+    }
     return E_OK;
 }
 
+/*
 uint8_t IocReceiveGroup(uint8_t ch, void *data, uint8_t num) {
     if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return E_OS_ID;
     IocChannelType *c = &IocChannelTable[ch];
@@ -603,23 +619,30 @@ uint8_t IocReceiveGroup(uint8_t ch, void *data, uint8_t num) {
     if (c->count == 0) c->flag_new = 0;
     return E_OK;
 }
-
-uint8_t IocHasNewData(uint8_t ch) {
+*/
+uint8_t IocHasNewData(uint8_t ch, TaskType receiver) {
     if (ch >= MAX_IOC_CHANNELS || !IocChannelTable[ch].used) return 0;
-    return IocChannelTable[ch].flag_new;
+    IocChannelType *c = &IocChannelTable[ch];
+
+    for (int i=0; i<c->num_receivers; i++) {
+        if (c->receivers[i] == receiver) return c->has_new[i];
+    }
+    return 0;
 }
+
 
 void Ioc_InitChannel(uint8_t ch, uint8_t data_size, TaskType *receivers, uint8_t num) {
     IocChannelTable[ch].used = 1;
     IocChannelTable[ch].data_size = data_size;
     IocChannelTable[ch].num_receivers = num;
-    for (int i=0;i<num;i++) {
-        IocChannelTable[ch].receivers[i] = receivers[i];
-    }
     IocChannelTable[ch].head = 0;
-    IocChannelTable[ch].tail = 0;
     IocChannelTable[ch].count = 0;
-    IocChannelTable[ch].flag_new = 0;
+
+    for (int i=0; i<num; i++) {
+        IocChannelTable[ch].receivers[i] = receivers[i];
+        IocChannelTable[ch].tail[i] = 0;
+        IocChannelTable[ch].has_new[i] = 0;
+    }
 }
 
 void OS_RequestSchedule(void) {
