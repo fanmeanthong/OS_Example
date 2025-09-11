@@ -243,6 +243,7 @@ void Task_SpeedSensor(void) {
     print_dec(speed);
     print_str(" km/h\r\n");
     IocSend(IOC_CH_SPEED, &speed);
+    //delay_ms(500);
     ChainTask(TASK_SENSOR_ID);
 }
 
@@ -275,7 +276,7 @@ void Task_ABS(void) {
 }
 
 // =====================
-// Main Function
+// Main Function ------------------- IOC 1_N Demo
 // =====================
 /**
  * @brief Main entry: system initialization, task setup, and scheduler loop
