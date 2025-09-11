@@ -11,6 +11,7 @@ LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections -lc -lnosys
 
 # Source files list
 SRCS_C := main.c $(wildcard Sys/src/*.c)
+SRCS_C += $(wildcard app/*.c)
 SRCS_S := startup_stm32f103.s $(wildcard Sys/asm/*.s)
 SRCS   := $(SRCS_C) $(SRCS_S)
 OBJS   := $(SRCS:.c=.o)

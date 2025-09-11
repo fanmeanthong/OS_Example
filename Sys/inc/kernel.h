@@ -99,8 +99,10 @@ typedef struct {
     //uint8_t curPrio;       // Priority hiện tại (có thể được boost)
     uint8_t ActivationCount;
     uint8_t OsTaskActivation;
+    uint8_t AppID; 
     EventMaskType SetEventMask;
     EventMaskType WaitEventMask;
+    
     //ResourceType resTaken; // Resource đang giữ (INVALID nếu không giữ)
 } TaskControlBlock;
 

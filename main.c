@@ -3,50 +3,9 @@
 #include "kernel.h"
 #include "uart.h"
 #include "setup.h"
-#include "os_hooks.h"
+#include "Os.h"
 #include <stdio.h>
-/**
- * @brief Global variable for current LED mode
- */
-LedMode g_mode;
-// =====================
-// Schedule Table Callbacks
-// =====================
-// Callbacks for Schedule Table
-void SetMode_Normal(void)  { g_mode = MODE_NORMAL; }
-void SetMode_Warning(void) { g_mode = MODE_WARNING; }
-void SetMode_Off(void)     { g_mode = MODE_OFF; }
 
-
-// --- Led control task ---
-void Task_LedTick(void) {
-    static uint16_t accA = 0, accC = 0;
-    const uint16_t period_normal = 500;
-    const uint16_t period_warn   = 100;
-
-    switch (g_mode) {
-    case MODE_NORMAL:
-        accA += 50;
-        if (accA >= period_normal) {
-            LedA_Toggle();
-            accA = 0;
-        }
-        break;
-    case MODE_WARNING:
-        accC += 50;
-        if (accC >= period_warn) {
-            Led_Toggle();
-            accC = 0;
-        }
-        break;
-    default:
-        LedA_Off();
-        Led_Off();
-        accA = accC = 0;
-        break;
-    }
-    TerminateTask();
-}
 
 // =====================
 // External Variables
@@ -282,35 +241,21 @@ void Task_ABS(void) {
  * @brief Main entry: system initialization, task setup, and scheduler loop
  */
 int main(void) {
-    // --- System & Peripheral Init ---
     SystemClock_Config();
     GPIO_InitAll();
     UART1_Init();
 
-    print_str("=== IOC 1-1 Demo Start ===\r\n");
+    print_str("=== TrustedFunction Demo Start ===\r\n");
 
-    // --- OS Init ---
     OS_Init();
 
-    // --- IOC Channel Init ---
-    TaskType recv_list_speed[2] = { TASK_CLUSTER_ID, TASK_ABS_ID };
-    Ioc_InitChannel(IOC_CH_SPEED, sizeof(int), recv_list_speed, 2);
+    TaskTable[0] = (TaskControlBlock){ 0, Task_Admin, SUSPENDED, 0, 1, 0 }; // App0 Trusted
+    TaskTable[1] = (TaskControlBlock){ 1, Task_User,  SUSPENDED, 0, 1, 1 }; // App1 Untrusted
 
-    // --- Task Table Setup ---
-    TaskTable[TASK_SENSOR_ID] = (TaskControlBlock){
-        TASK_SENSOR_ID, Task_SpeedSensor, SUSPENDED, 0, 2
-    };
-    TaskTable[TASK_CLUSTER_ID] = (TaskControlBlock){
-        TASK_CLUSTER_ID, Task_Cluster, SUSPENDED, 0, 2
-    };
-    TaskTable[TASK_ABS_ID] = (TaskControlBlock){
-        TASK_ABS_ID, Task_ABS, SUSPENDED, 0, 2
-    };
 
-    // --- Activate Initial Tasks ---
-    ActivateTask(TASK_SENSOR_ID);
-    ActivateTask(TASK_CLUSTER_ID);
-    ActivateTask(TASK_ABS_ID);
+    /* Activate cả 2 Task */
+    ActivateTask(0); // Admin (Trusted)
+    ActivateTask(1); // User (Untrusted)
 
     while (1) {
         OS_Schedule();
