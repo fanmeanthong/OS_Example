@@ -245,7 +245,7 @@ int main(void) {
     GPIO_InitAll();
     UART1_Init();
 
-    print_str("=== TrustedFunction Demo Start ===\r\n");
+    print_str("====== TrustedFunction Demo Start =======\r\n");
 
     OS_Init();
 
