@@ -251,12 +251,12 @@ int main(void) {
 
     TaskTable[0] = (TaskControlBlock){ 0, Task_Admin, SUSPENDED, 0, 1, 0 }; // App0 Trusted
     TaskTable[1] = (TaskControlBlock){ 1, Task_User,  SUSPENDED, 0, 1, 1 }; // App1 Untrusted
-
+    TaskTable[2] = (TaskControlBlock){ 2, Task_App2,  SUSPENDED, 0, 1, 2 }; // App2 Mixed
 
     /* Activate cả 2 Task */
     ActivateTask(0); // Admin (Trusted)
     ActivateTask(1); // User (Untrusted)
-
+    ActivateTask(2); // App2 (Mixed)
     while (1) {
         OS_Schedule();
     }

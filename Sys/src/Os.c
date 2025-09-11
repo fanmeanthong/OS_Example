@@ -15,14 +15,15 @@ static const TrustedFunctionType s_trustedFunctions[] = {
 /* === Cờ phân quyền cho từng App ===
  *   App0 (Trusted): có quyền gọi cả TF0, TF1
  *   App1 (Untrusted): không có quyền
+ * 
+ * ---> Có thể viết thêm hàm InitPermissions() để khởi tạo động
  */
 static const uint8_t s_trustedPermissions[][2] = {
     /* App0 */ {1, 1},  // có quyền gọi cả TF0, TF1
-    /* App1 */ {0, 0}   // không có quyền gọi gì
+    /* App1 */ {0, 0},  // không có quyền gọi gì
+    /* App2 */ {1, 0}   // chỉ được phép TF0 (LogWrite), cấm TF1 (LedCtrl)
 };
 
-/* === Biến mô phỏng App hiện tại (runtime) === */
-static uint8_t CurrentAppID = 0;  // 0=Trusted, 1=Untrusted
 /* Số lượng TF tối đa */
 #define TF_COUNT   (sizeof(s_trustedFunctions)/sizeof(s_trustedFunctions[0]))
 
@@ -70,3 +71,4 @@ static void Trusted_LedCtrl(void* param)
     else
         print_str("[TF-LED] LED OFF\r\n");
 }
+

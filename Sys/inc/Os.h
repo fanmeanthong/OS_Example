@@ -22,5 +22,7 @@ static void Trusted_LedCtrl(void* param);
 #define TF_LED_CTRL    1
 
 void Task_User(void);
-void Task_Admin(void) ;
+void Task_Admin(void);
+void Task_App2(void);
+
 #endif /* OS_H */

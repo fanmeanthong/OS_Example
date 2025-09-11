@@ -49,7 +49,7 @@ void Task_LedTick(void) {
 /* Task Trusted: được phép ghi log & điều khiển LED */
 void Task_Admin(void) {
     print_str(">>>>> Enter Admin Task -------\r\n");
-    
+
     const char* msg = "System started by Admin";
     int ledState = 1;
 
@@ -75,6 +75,23 @@ void Task_User(void) {
     CallTrustedFunction(TF_LED_CTRL, (void*)&ledState); // Bị OS chặn
 
     print_str("<<<<< Exit User Task --------\r\n");
+    print_str("\r\n");
+    TerminateTask();
+}
+
+void Task_App2(void) {
+    print_str(">>>>> Enter App2 Task -------\r\n");
+
+    const char* msg = "App2 write log";
+    int ledState = 1;
+
+    /* Được phép: TF0 */
+    CallTrustedFunction(TF_LOG_WRITE, (void*)msg);
+
+    /* Không được phép: TF1 */
+    CallTrustedFunction(TF_LED_CTRL, (void*)&ledState);
+    
+    print_str("<<<<< Exit App2 Task --------\r\n");
     print_str("\r\n");
     TerminateTask();
 }
